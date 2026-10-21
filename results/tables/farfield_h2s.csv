@@ -1,0 +1,25 @@
+release,Q_m3h,weather,receptor,AEGL-3 (10 min) 76 ppm,IDLH 100 ppm,AEGL-2 (10 min) 41 ppm,AEGL-1 (10 min) 0.75 ppm,odour threshold 0.01 ppm
+R1 chatter episode (time-mean 44 m³/h),44.0,D5,roof (18.25 m),1.2,1.0,1.8,16.6,150.8
+R1 chatter episode (time-mean 44 m³/h),44.0,D5,ground (1.5 m),0.0,0.0,0.0,0.0,0.0
+R1 chatter episode (time-mean 44 m³/h),44.0,D3,roof (18.25 m),1.1,0.9,1.7,21.4,198.2
+R1 chatter episode (time-mean 44 m³/h),44.0,D3,ground (1.5 m),0.0,0.0,0.0,0.0,0.0
+R1 chatter episode (time-mean 44 m³/h),44.0,F2,roof (18.25 m),0.6,0.5,0.7,1.4,655.5
+R1 chatter episode (time-mean 44 m³/h),44.0,F2,ground (1.5 m),0.0,0.0,0.0,0.0,0.0
+R2 downstream stop (84 m³/h),84.5,D5,roof (18.25 m),1.6,1.3,2.4,23.0,214.1
+R2 downstream stop (84 m³/h),84.5,D5,ground (1.5 m),0.0,0.0,0.0,0.0,0.0
+R2 downstream stop (84 m³/h),84.5,D3,roof (18.25 m),1.2,1.0,2.0,29.6,287.3
+R2 downstream stop (84 m³/h),84.5,D3,ground (1.5 m),0.0,0.0,0.0,0.0,0.0
+R2 downstream stop (84 m³/h),84.5,F2,roof (18.25 m),0.5,0.5,0.6,1.1,957.5
+R2 downstream stop (84 m³/h),84.5,F2,ground (1.5 m),0.0,0.0,0.0,0.0,0.0
+R3 isolated digester (41 m³/h),41.2,D5,roof (18.25 m),1.1,0.9,1.7,16.0,145.8
+R3 isolated digester (41 m³/h),41.2,D5,ground (1.5 m),0.0,0.0,0.0,0.0,0.0
+R3 isolated digester (41 m³/h),41.2,D3,roof (18.25 m),1.1,0.9,1.7,20.7,191.2
+R3 isolated digester (41 m³/h),41.2,D3,ground (1.5 m),0.0,0.0,0.0,0.0,0.0
+R3 isolated digester (41 m³/h),41.2,F2,roof (18.25 m),0.6,0.6,0.7,1.5,632.3
+R3 isolated digester (41 m³/h),41.2,F2,ground (1.5 m),0.0,0.0,0.0,0.0,0.0
+valve fully at min. opening (141 m³/h),141.0,D5,roof (18.25 m),2.0,1.7,3.0,29.7,287.3
+valve fully at min. opening (141 m³/h),141.0,D5,ground (1.5 m),0.0,0.0,0.0,0.0,0.0
+valve fully at min. opening (141 m³/h),141.0,D3,roof (18.25 m),1.2,1.0,1.9,38.4,403.7
+valve fully at min. opening (141 m³/h),141.0,D3,ground (1.5 m),0.0,0.0,0.0,0.0,431.7
+valve fully at min. opening (141 m³/h),141.0,F2,roof (18.25 m),0.4,0.4,0.5,0.8,1318.2
+valve fully at min. opening (141 m³/h),141.0,F2,ground (1.5 m),0.0,0.0,0.0,0.0,0.0

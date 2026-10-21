@@ -1,0 +1,41 @@
+case,f_on,parameter,base,low,high
+1,1,ignition probability 0.005 / 0.05,0.001322,0.00113,0.001706
+1,1,worker ignition source 0 / 0.01,0.001322,0.001267,0.001542
+1,1,fatality given flash in the small plume 0.03 / 1.0,0.001322,0.001175,0.00321
+1,1,P(inside flammable plume at the valve) 0.03 / 0.3,0.001322,0.001175,0.001742
+1,1,responder goes to the roof: all branches x0.5 / x2 (capped at 1),0.001322,0.001223,0.001498
+1,1,time at the valve 2 / 15 min,0.001322,0.001227,0.001776
+1,1,prolonged stay in the H2S plume 0.005 / 0.3 (no detector),0.001322,0.001255,0.00257
+1,1,PVRV fouled by foam 0.03 / 0.3,0.001322,0.0006033,0.003375
+1,1,"H2S in the gas 500 ppm (in-situ desulphurisation) / 5,845 ppm (max)",0.001322,0.001233,0.002446
+1,1,duty cycle ignored (time-mean plume) / pulses at full stay,0.001322,0.001242,0.001879
+1,1,weather: KMA hourly (base) / former assumed day-night mix,0.001322,0.001322,0.001575
+1,1,weather: all D5 / all calm,0.001322,0.001338,0.002476
+1,1,routine roof work 0.5 / 6 h per week,0.001322,0.001249,0.001517
+1,1,seal-failure injury 0.02 / 0.3,0.001322,0.0005847,0.003165
+1,1,manual vent fouled too 0.1 / 0.6,0.001322,0.0008542,0.002024
+1,1,near the valve during routine work 0.1 / 1.0,0.001322,0.001257,0.00155
+1,1,"PAH available (base) / no PAH: roof visits x1.5, plume stay x2 (foam, block)",0.001322,0.001322,0.001443
+1,1,flare PFD 0.01 / 0.10,0.001322,0.001164,0.001541
+1,1,foaming 1 / 3 per year,0.001322,0.0007952,0.001849
+1,1,hard-fault share 0 / 0.3,0.001322,0.001322,0.001749
+1,0.8,ignition probability 0.005 / 0.05,0.001126,0.001014,0.001351
+1,0.8,worker ignition source 0 / 0.01,0.001126,0.001102,0.001226
+1,0.8,fatality given flash in the small plume 0.03 / 1.0,0.001126,0.001075,0.001788
+1,0.8,P(inside flammable plume at the valve) 0.03 / 0.3,0.001126,0.001075,0.001273
+1,0.8,responder goes to the roof: all branches x0.5 / x2 (capped at 1),0.001126,0.001093,0.001172
+1,0.8,time at the valve 2 / 15 min,0.001126,0.001094,0.001288
+1,0.8,prolonged stay in the H2S plume 0.005 / 0.3 (no detector),0.001126,0.001104,0.001546
+1,0.8,PVRV fouled by foam 0.03 / 0.3,0.001126,0.0004078,0.00318
+1,0.8,"H2S in the gas 500 ppm (in-situ desulphurisation) / 5,845 ppm (max)",0.001126,0.001096,0.00154
+1,0.8,duty cycle ignored (time-mean plume) / pulses at full stay,0.001126,0.001099,0.001336
+1,0.8,weather: KMA hourly (base) / former assumed day-night mix,0.001126,0.001126,0.001212
+1,0.8,weather: all D5 / all calm,0.001126,0.001132,0.001517
+1,0.8,routine roof work 0.5 / 6 h per week,0.001126,0.001102,0.001191
+1,0.8,seal-failure injury 0.02 / 0.3,0.001126,0.0003892,0.00297
+1,0.8,manual vent fouled too 0.1 / 0.6,0.001126,0.0006587,0.001828
+1,0.8,near the valve during routine work 0.1 / 1.0,0.001126,0.001105,0.001202
+1,0.8,"PAH available (base) / no PAH: roof visits x1.5, plume stay x2 (foam, block)",0.001126,0.001126,0.001188
+1,0.8,flare PFD 0.01 / 0.10,0.001126,0.001126,0.001127
+1,0.8,foaming 1 / 3 per year,0.001126,0.0005997,0.001653
+1,0.8,hard-fault share 0 / 0.3,0.001126,0.001126,0.001301

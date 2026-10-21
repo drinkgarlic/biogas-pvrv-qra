@@ -1,0 +1,10 @@
+case,p_op,situation,t_alarm_min,t_open_min,warning_min
+1,4.0,"holder full, surplus 25 m3/h (production 85)",23.9,28.1,4.2
+1,4.0,"holder full, surplus 55 m3/h (production 115)",10.9,12.8,1.9
+1,4.0,"one digester blocked, 41 m3/h",4.4,5.1,0.8
+2,3.0,"holder full, surplus 25 m3/h (production 85)",53.8,58.0,4.2
+2,3.0,"holder full, surplus 55 m3/h (production 115)",24.5,26.4,1.9
+2,3.0,"one digester blocked, 41 m3/h",9.9,10.6,0.8
+3,2.0,"holder full, surplus 25 m3/h (production 85)",83.7,87.9,4.2
+3,2.0,"holder full, surplus 55 m3/h (production 115)",38.0,39.9,1.9
+3,2.0,"one digester blocked, 41 m3/h",15.3,16.1,0.8

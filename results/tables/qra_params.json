@@ -1,0 +1,174 @@
+{
+ "weather_mode": {
+  "v": "hourly",
+  "src": "'hourly': KMA ASOS 138 record, Turner stability class and vent-height wind per hour (met_stability.py); 'mix': the day/night mix below"
+ },
+ "weather_day": {
+  "v": {
+   "D5": 0.5,
+   "D3": 0.3,
+   "calm": 0.2
+  },
+  "src": "Former assumption, kept for weather_mode = mix: daytime mix of D / 5 m/s, D / 3 m/s and calm"
+ },
+ "weather_night": {
+  "v": {
+   "F2": 0.6,
+   "D3": 0.2,
+   "calm": 0.2
+  },
+  "src": "Assumption: night-time mix of F / 2 m/s, D / 3 m/s and calm"
+ },
+ "p_ign": {
+  "v": 0.02,
+  "src": "TNO Purple Book (CPR 18E) table 4.3: continuous release of flammable gas < 10 kg/s, immediate + delayed ignition"
+ },
+ "p_ign_worker": {
+  "v": 0.002,
+  "src": "Assumption: ignition source brought by the worker at the valve (tools, torch, static) per visit; hot-work rules apply"
+ },
+ "p_fat_flash_small": {
+  "v": 0.1,
+  "src": "Assumption: fatality given ignition while inside the sub-metre plume at the vent (face/hand burns likely, death unlikely); TNO uses 1.0 for engulfment in large clouds"
+ },
+ "p_fat_flash_R5": {
+  "v": 1.0,
+  "src": "TNO Green Book: fatality 1.0 inside the flash-fire envelope of the 30-s depressurisation cloud (LFL 6-13 m)"
+ },
+ "p_zone": {
+  "v": 0.1,
+  "src": "Assumption from the plume geometry (radius 0.1-0.4 m at the LFL distance): probability that a person at 1 m from the vent is inside the flammable plume"
+ },
+ "p_zone_R5": {
+  "v": 0.5,
+  "src": "Assumption: the 30-s depressurisation cloud (LFL 6-13 m) covers most of the roof"
+ },
+ "p_near_valve_routine": {
+  "v": 0.3,
+  "src": "Assumption: share of the routine time on the roof spent within a few metres of the PVRV (the valve is one of the items of the round)"
+ },
+ "t_at_valve_min": {
+  "v": 5.0,
+  "src": "Assumption: minutes a responding operator spends at a venting valve"
+ },
+ "t_fix_min": {
+  "v": 15.0,
+  "src": "Assumption: minutes from arrival until the venting is stopped (flare restart, bypass, clearing the blockage)"
+ },
+ "p_in_plume_h2s": {
+  "v": 0.02,
+  "src": "Assumption: probability that the visit involves a prolonged stay inside the H2S plume (downwind of the vent, leaning over it) despite the personal H2S alarm (10 ppm) that plant staff carry; 0.1-0.3 without a detector (tornado)"
+ },
+ "lsir_distance_m": {
+  "v": 3.0,
+  "src": "Location-specific IR evaluated for a permanent presence 3 m from the vent (roof walkway)"
+ },
+ "detection": {
+  "v": {
+   "demand": "flare controller: ignition-failure alarm within ~1 min",
+   "stop": "consumer trip alarm, immediate",
+   "foam": "PAH on PT-101 of that digester (set 4.8 kPag) ~4 min after the blockage, 1-2 min before the valve opens",
+   "block": "same as foam",
+   "wv": "no direct signal; holder pressure trend if a transmitter exists, otherwise the weekly round",
+   "R5": "PT-101 above the PVRV setting and still rising = the valve is not relieving"
+  },
+  "src": "Plant instrumentation (ISO-BG-001 REV.1): PT-101A/B, holder level, flare and consumer status. The PVRV itself has no position switch and there is no gas detector at the vent"
+ },
+ "action": {
+  "v": {
+   "demand": "control-room restart (same as the automatic retry); if it fails, to the FLARE, not the digester roof",
+   "stop": "manual flare start from the control room",
+   "foam": "field check of the digester: sight glass, condensate pot, XV, PVRV - all on the roof",
+   "block": "same as foam",
+   "wv": "inspection at the holder; digester roof only if PT-101 is high",
+   "R5": "stop feeding and open the manual vent ON THE ROOF within the 27 min to seal failure"
+  },
+  "src": "Assumption"
+ },
+ "p_roof": {
+  "v": {
+   "demand": [
+    0.1,
+    0.05
+   ],
+   "stop": [
+    0.1,
+    0.05
+   ],
+   "foam": [
+    0.7,
+    0.5
+   ],
+   "block": [
+    0.7,
+    0.5
+   ],
+   "wv": [
+    0.3,
+    0.2
+   ]
+  },
+  "src": "Assumption (day, night): probability that the response puts the operator on the digester roof while the valve is still venting, following the action column above"
+ },
+ "n_responders": {
+  "v": 3,
+  "src": "Assumption: one field operator per shift, three shifts; a given individual answers one third of the alarms. IR_worker = PLL_resp / 3 + routine (the 2 h/week are assigned to one person)"
+ },
+ "control_room": {
+  "v": "24 h, three shifts",
+  "src": "Assumption; the night response distribution R_night (BN) applies 20-08 h"
+ },
+ "PAH_kPag": {
+  "v": 4.8,
+  "src": "Assumption: high-pressure alarm on PT-101 at 4.8 kPag (0.25 kPa below the PVRV opening pressure 5.05)"
+ },
+ "routine_h_per_week": {
+  "v": 2.0,
+  "src": "User: about 2 h/week of regular work on the digester roofs, in the day shift (08-20, 7 days)"
+ },
+ "p_fouled": {
+  "v": 0.1,
+  "src": "Assumption: probability that foam reaching the digester outlet also fouls the PVRV. The BN uses 0.3 for the opening branch; 0.1 here keeps the seal-failure chain (0.6 x 0.1 x not prevented) near the EA 2019 incident base rate"
+ },
+ "p_injury_seal": {
+  "v": 0.1,
+  "src": "Assumption: fatality for a person on the roof when the seal / manhole lets go at 10 kPag (blow-out, fall from the roof edge, engulfment); the flash fire of the 30-s cloud is counted separately (p_zone_R5, p_fat_flash_R5)"
+ },
+ "p_vent_fouled": {
+  "v": 0.3,
+  "src": "Assumption: probability that the manual vent on the same roof is fouled by the same foam as the PVRV, so that opening it does not relieve the digester (the operator is then on the roof when the seal fails)"
+ },
+ "t_open_vent_min": {
+  "v": 3.0,
+  "src": "Assumption: minutes from arrival on the roof to an open manual vent; arrivals within the response bucket R(<= 0.5 h) are taken uniform between 5 and 30 min, so the share arriving too late is t_open / 25"
+ },
+ "p_seal_kPag": {
+  "v": 10.0,
+  "src": "Seal / manhole failure taken at twice the design pressure of the digester roof (5.0 kPag); the window from the PAH to failure is (10 - 4.8) / (0.266 x 41.2) = 28.5 min"
+ },
+ "t_vent_manual_min": {
+  "v": 15.0,
+  "src": "Assumption: minutes the operator stays beside the manual vent after opening it (41 m3/h, continuous) until the feed stop brings the pressure down"
+ },
+ "yH2S_ppm": {
+  "v": 2527.0,
+  "src": "PyADM1ODE annual mean of the raw gas (930-5,845 ppm). If the plant desulphurises in the digester headspace (micro-aeration) the PVRV sees 200-500 ppm instead - the single most important composition parameter of the QRA"
+ },
+ "duty": {
+  "v": {
+   "R1 chatter (valve open)": 0.3120567375886525,
+   "R2 downstream stop": 0.599290780141844,
+   "R3 isolated digester": 0.2921985815602837,
+   "R5 blocked PVRV, continuous": 1.0
+  },
+  "src": "1-s model: every release is realised as pulses at the minimum stable opening (141 m3/h); duty = time-mean rate / 141. The H2S dose (probit exponent n = 1.9) uses duty x stay at the open-valve concentration, i.e. delta^(1-n) = 2.9x more than a time-mean plume would give for R1"
+ },
+ "generic_f_pvrv": {
+  "v": 0.01,
+  "src": "Generic-QRA comparison: spurious / demand-driven PVRV opening 1e-2 per valve-year (CCPS-type initiating-event value), 2 valves"
+ },
+ "generic_dur_h": {
+  "v": 1.0,
+  "src": "Generic-QRA comparison: assumed release duration"
+ }
+}
