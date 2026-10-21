@@ -14,8 +14,9 @@ labels = {(1, 1.0): 'Case 1 (4.0 kPag)\nflare start 100 %', (1, 0.8): 'Case 1 (4
 base = r['case'].astype(str).str.fullmatch(r'\d+'); rr = r[base].copy(); rr['case'] = rr['case'].astype(int)
 opts = r[~base & (r.case != 'generic')].copy()      # design options: '<case> + <option>'
 order = [(1, 1.0), (1, 0.8), (3, 1.0), (3, 0.8)]
-BR = [('IR_resp_demand', 'ignition failure (chatter)'), ('IR_resp_stop', 'downstream stop'), ('IR_resp_foam', 'foam blockage'), ('IR_resp_block', 'condensate / freezing / XV'), ('IR_resp_wv', 'vent valve stuck'), ('IR_resp_R5', 'blocked PVRV -> seal failure'), ('IR_rout', 'routine presence')]
-BC = [C[1], C[0], C[2], C[4], C[3], C[5], C[7]]
+BR = [('IR_resp_demand', 'ignition failure (chatter)'), ('IR_resp_stop', 'downstream stop'), ('IR_resp_foam', 'foam blockage'), ('IR_resp_block', 'condensate / freezing / XV'), ('IR_resp_wv', 'vent valve stuck'),
+      ('IR_resp_R5', 'PVRV fouled by foam -> seal failure'), ('IR_resp_HW', 'PVRV fails to open (hardware)'), ('IR_rout', 'routine presence')]
+BC = [C[1], C[0], C[2], C[4], C[3], C[5], C[6], C[7]]
 
 # ---------------------------------------------------------------- 1. event tree
 fig, ax = plt.subplots(figsize=(13, 5.6)); ax.axis('off'); ax.set_xlim(0, 100); ax.set_ylim(0, 60)
@@ -25,16 +26,16 @@ def arr(x0, y0, x1, y1, t='', dy=1.2):
     ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle='-|>', mutation_scale=9, color=INK, lw=0.8))
     if t: ax.text((x0 + x1) / 2, (y0 + y1) / 2 + dy, t, ha='center', fontsize=7.2, color='#333333')
 box(1, 44, 17, 12, 'BN (Appendix V)\nP(open | hour, initiating event)\n+ P(operator arrives\nwhile venting)', fc='#e3f2fd')
-box(22, 44, 16, 12, 'release type\nR1 chatter 141 m³/h pulses\nR2/R3 continuous 41-84 m³/h\nR5 seal failure (39 m³ + q/2)', fc='#fff3e0')
-box(42, 44, 14, 12, 'weather (day/night)\nD5 / D3 / F2 / calm\nplume: LFL 1-3 m,\nH₂S 200-1,400 ppm at 1 m', fc='#fff3e0')
+box(22, 44, 16, 12, 'release type\nR1 chatter 141 m³/h pulses\nR2/R3 continuous 41-84 m³/h\nno relief: fouled (BN 0.1) or\nfail-to-open (NOG-070)', fc='#fff3e0', fs=7.6)
+box(42, 44, 14, 12, 'weather of the hour\n(KMA ASOS 138)\nH₂S of the hour (ADM1)\nplume at 1 m / 3 m', fc='#fff3e0')
 box(59, 50, 16, 8, 'detection -> action -> roof?\nflare alarm 0.1 / 0.05\nPAH (PT-101) 0.7 / 0.5\nno signal (WV) 0.3 / 0.2', fc='#ffebee', fs=7.2); box(59, 40, 16, 7, 'routine roof work\n2 h/week (day), 0.3 near\nthe valve', fc='#ffebee', fs=7.2)
 box(78, 52, 20, 6, 'inside flammable plume (0.1)\n× ignition (0.02 · overlap + 0.002)\n× fatality in small plume (0.1)', fc='#e8f5e9', fs=7.2)
-box(78, 44, 20, 6, 'prolonged stay in H₂S plume (0.02)\n× probit(C at 1 m, 5 min)', fc='#e8f5e9', fs=7.2)
-box(78, 33, 20, 8, 'R5 blocked PVRV: 28.5 min PAH → failure\nR(≤0.5 h) arrives; manual vent on the roof,\nfouled 0.3, 3 min to open → prevent /\nbeside the vent 15 min / on roof at failure', fc='#e8f5e9', fs=6.8)
+box(78, 44, 20, 6, 'prolonged stay in H₂S plume (0.02)\n× RIVM 2018 probit (C at 1 m, duty × 5 min)', fc='#e8f5e9', fs=7.0)
+box(78, 33, 20, 8, 'no relief: window PAH → seal (8/10/12 kPag)\nfrom the rise rate of the hour; response CDF;\nmanual vent on the roof (fouled 0.3 if foam),\n3 min to open → prevent / on roof at failure', fc='#e8f5e9', fs=6.6)
 arr(18, 50, 22, 50); arr(38, 50, 42, 50); arr(56, 50, 59, 54); arr(56, 50, 59, 43.5); arr(75, 54, 78, 55); arr(75, 54, 78, 47); arr(75, 43.5, 78, 47); arr(75, 43.5, 78, 37)
 box(1, 10, 97, 20, '', fc='#fafafa')
 ax.text(49.5, 26, 'risk integration, hour by hour', ha='center', fontsize=9, fontweight='bold')
-ax.text(49.5, 20.5, r'$PLL(h)=\sum_k o_k(h)\,P_{roof,k}(h)\,P_{fat}(k,w(h)) + \sum_k s_k(h)\,f_{rout}(h)\,p_{near}\,P_{fat,hour}(k,w(h)) + P_{init,R5}(h)\,[P_{prev}P_{fat,vent} + P_{on\,roof}(P_{seal}+P_{fat,cloud})], \quad IR_{worker}=PLL_{resp}/3+PLL_{rout}$', ha='center', fontsize=8.6)
+ax.text(49.5, 20.5, r'$PLL(h)=\sum_k o_k(h)\,P_{roof,k}(h)\,P_{fat}(k,w(h)) + \sum_k s_k(h)\,f_{rout}(h)\,p_{near}\,P_{fat,hour}(k,w(h)) + \sum_j n_j(h)\,[P_{prev}P_{fat,vent} + P_{on\,roof}(P_{seal}+P_{fat,cloud})], \quad IR_{worker}=PLL_{resp}/3+PLL_{rout}$', ha='center', fontsize=8.6)
 ax.text(49.5, 14.5, 'o_k: P(operator finds the valve venting);  s_k: state probability (valve open);  f_rout: 2 h/week of daytime roof work\n-> PLL and IR, monthly and hour-of-day profiles, LSIR at 3 m, CH₄ emission, design options A / B', ha='center', fontsize=8, color='#333333')
 ax.text(1, 4, 'Blue: frequency side from the BN.  Orange: consequence side (source term, weather, plume).  Red: exposure.  Green: fatality probability per exposure.  Values in brackets are the base-case assumptions (tornado in fig. 5).', fontsize=7.5, color='#444444')
 fig.savefig(os.path.join(FIG, 'qra_event_tree.png'), dpi=150, bbox_inches='tight'); plt.close(fig)
@@ -50,8 +51,8 @@ for xi, t in zip(x, iw): ax[0].text(xi + 0.32, t, f'{t:.1e}', ha='left', va='cen
 g = float(r[r.case == 'generic']['IR_resp'].iloc[0]); ax[0].axhline(g, color=C[7], lw=1, ls='--'); ax[0].text(3.45, g * 1.3, f'generic-frequency QRA {g:.1e}', fontsize=7.5, ha='right', color=C[7])
 for v, t in ((1e-3, 'HSE: intolerable for workers above 1e-3'), (1e-6, 'broadly acceptable below 1e-6')):
     ax[0].axhline(v, color='k', lw=0.6, ls=':'); ax[0].text(-0.4, v * 0.62, t, fontsize=7, color='#333333', bbox=dict(fc='white', ec='none', alpha=0.75, pad=1))
-ax[0].set_yscale('log'); ax[0].set_ylim(1e-7, 3e-2); ax[0].set_xticks(x); ax[0].set_xticklabels([labels[k] for k in order], fontsize=7.5); ax[0].set_ylabel('fatality risk per year: bars = PLL over all responders and routine work')
-ax[0].set_title('(a) annual IR by case and initiating event', loc='left'); ax[0].legend(fontsize=7, ncol=2, loc='upper right')
+ax[0].set_yscale('log'); ax[0].set_ylim(1e-7, 3e-1); ax[0].set_xticks(x); ax[0].set_xticklabels([labels[k] for k in order], fontsize=7.5); ax[0].set_ylabel('fatality risk per year: bars = PLL over all responders and routine work')
+ax[0].set_title('(a) annual IR by case and initiating event', loc='left'); ax[0].legend(fontsize=7, ncol=3, loc='upper center', bbox_to_anchor=(0.5, -0.13))
 ch4 = [float(rr[(rr.case == c) & (np.isclose(rr.f_on, f))]['ch4_kg'].iloc[0]) for c, f in order]; op = [float(rr[(rr.case == c) & (np.isclose(rr.f_on, f))]['openings'].iloc[0]) for c, f in order]
 ax[1].bar(x - 0.18, op, 0.36, color=C[1], label='PVRV openings (per year)'); a2 = ax[1].twinx(); a2.bar(x + 0.18, ch4, 0.36, color=C[2], label='CH₄ vented (kg/year)'); a2.grid(False)
 ax[1].set_yscale('log'); a2.set_yscale('log'); ax[1].set_xticks(x); ax[1].set_xticklabels([labels[k].replace(' kPag)', ')') for k in order], fontsize=7); ax[1].set_ylabel('openings (per year)'); a2.set_ylabel('CH₄ (kg/year)')
@@ -72,12 +73,13 @@ ax[1].set_xlabel('hour of day'); ax[1].set_ylabel('IR contribution of the hour (
 fig.savefig(os.path.join(FIG, 'qra_profiles.png'), dpi=150, bbox_inches='tight'); plt.close(fig)
 
 # ---------------------------------------------------------------- 4. tornado (Case 1, 100 % and 80 %)
-fig, ax = plt.subplots(1, 2, figsize=(13, 5.2), gridspec_kw=dict(wspace=0.6))
+fig, ax = plt.subplots(1, 2, figsize=(16, 6.0), gridspec_kw=dict(wspace=1.05))
 for a, f in zip(ax, (1.0, 0.8)):
     s = sens[(sens.case == 1) & (np.isclose(sens.f_on, f))].copy(); b = float(s['base'].iloc[0]); s['span'] = (np.log10(s['high']) - np.log10(s['low'])).abs(); s = s.sort_values('span'); y = np.arange(len(s))
     a.barh(y, np.log10(s['low']) - np.log10(b), left=np.log10(b), color=C[0], height=0.6, label='first value'); a.barh(y, np.log10(s['high']) - np.log10(b), left=np.log10(b), color=C[1], height=0.6, label='second value')
     a.axvline(np.log10(b), color=INK, lw=0.8); a.set_yticks(y); a.set_yticklabels(s['parameter'], fontsize=7.2); a.grid(axis='y', visible=False)
-    ticks = np.arange(-4, -1); a.set_xticks(ticks); a.set_xlim(-4.2, -1.8); a.set_xticklabels([f'1e{t}' for t in ticks]); a.set_xlabel(f'PLL, responders + routine work (base {b:.1e})')
+    lo_, hi_ = np.floor(np.log10(s[['low', 'high']].min().min())), np.ceil(np.log10(s[['low', 'high']].max().max())); ticks = np.arange(lo_, hi_ + 1)
+    a.set_xticks(ticks); a.set_xlim(lo_ - 0.2, hi_ + 0.2); a.set_xticklabels([f'1e{int(t)}' for t in ticks]); a.set_xlabel(f'PLL, responders + routine work (base {b:.1e})')
     a.set_title(f'Case 1, flare start {int(f*100)} %', loc='left'); a.legend(fontsize=7, loc='lower right')
 fig.savefig(os.path.join(FIG, 'qra_tornado.png'), dpi=150, bbox_inches='tight'); plt.close(fig)
 
@@ -107,7 +109,23 @@ for j, (nm, key) in enumerate(onames):
     ax.bar(x + (j - 1.5) * w, v, w, color=[C[7], C[0], C[2], C[1]][j], label=nm)
     for xi, t in zip(x + (j - 1.5) * w, v): ax.text(xi, t * 1.1, f'{t:.1e}', ha='center', fontsize=6.5, rotation=90)
 ax.axhline(1e-3, color='k', lw=0.6, ls=':'); ax.text(3.45, 1.15e-3, 'HSE: intolerable for workers above 1e-3', fontsize=7, ha='right')
-ax.set_yscale('log'); ax.set_ylim(1e-6, 1e-2); ax.set_xticks(x); ax.set_xticklabels([labels[k] for k in order], fontsize=7.5); ax.set_ylabel('IR of the most exposed individual (per year)')
+ax.set_yscale('log'); ax.set_ylim(1e-5, 1e-1); ax.set_xticks(x); ax.set_xticklabels([labels[k] for k in order], fontsize=7.5); ax.set_ylabel('IR of the most exposed individual (per year)')
 ax.set_title('Design options: A) position switch / gas detector at the PVRV, B) second relief path on its own nozzle (beta = 0.1) and a remotely operated vent', loc='left', fontsize=8.5); ax.legend(fontsize=7, ncol=4, loc='upper right')
 fig.savefig(os.path.join(FIG, 'qra_design_options.png'), dpi=150, bbox_inches='tight'); plt.close(fig)
+
+# ---------------------------------------------------------------- 7. static vs dynamic, and by effect
+sd = pd.read_csv(os.path.join(OUT, 'static_vs_dynamic.csv')); eb = pd.read_csv(os.path.join(OUT, 'risk_by_effect.csv'))
+fig, ax = plt.subplots(1, 2, figsize=(13, 4.2), gridspec_kw=dict(wspace=0.3))
+g = float(r[r.case == 'generic']['IR_total'].iloc[0])
+for j, (col, nm, colr) in enumerate((('static', 'static QRA (annual means, same scenarios)', C[0]), ('dynamic', 'dynamic QRA (hour by hour)', C[1]))):
+    v = [float(sd[(sd.case == c) & np.isclose(sd.f_on, f)][col].iloc[0]) for c, f in order]; ax[0].bar(x + (j - 0.5) * 0.36, v, 0.36, color=colr, label=nm)
+    for xi, t in zip(x + (j - 0.5) * 0.36, v): ax[0].text(xi, t * 1.08, f'{t:.1e}', ha='center', fontsize=7)
+ax[0].axhline(g, color=C[7], ls='--', lw=1); ax[0].text(3.45, g * 1.3, f'generic-frequency QRA {g:.1e}', fontsize=7.5, ha='right', color=C[7])
+ax[0].set_yscale('log'); ax[0].set_ylim(1e-6, 1e-1); ax[0].set_xticks(x); ax[0].set_xticklabels([labels[k] for k in order], fontsize=7.5); ax[0].set_ylabel('PLL (per year)'); ax[0].legend(fontsize=7.5, loc='upper right')
+ax[0].set_title('(a) generic vs static vs dynamic', loc='left')
+bottom = np.zeros(4)
+for col, nm, colr in (('PLL_h2s', 'H₂S (RIVM 2018 probit)', C[4]), ('PLL_flash', 'flash fire', C[3]), ('PLL_mech', 'seal failure (mechanical)', C[7])):
+    v = np.array([float(eb[(eb.case == c) & np.isclose(eb.f_on, f)][col].iloc[0]) for c, f in order]); ax[1].bar(x, v, 0.6, bottom=bottom, color=colr, label=nm); bottom += v
+ax[1].set_xticks(x); ax[1].set_xticklabels([labels[k] for k in order], fontsize=7.5); ax[1].set_ylabel('PLL (per year)'); ax[1].legend(fontsize=7.5); ax[1].set_title('(b) PLL by effect', loc='left')
+fig.savefig(os.path.join(FIG, 'qra_static_dynamic.png'), dpi=150, bbox_inches='tight'); plt.close(fig)
 print('fig_qra ok')

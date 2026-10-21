@@ -126,9 +126,17 @@
   "v": 2.0,
   "src": "User: about 2 h/week of regular work on the digester roofs, in the day shift (08-20, 7 days)"
  },
- "p_fouled": {
-  "v": 0.1,
-  "src": "Assumption: probability that foam reaching the digester outlet also fouls the PVRV. The BN uses 0.3 for the opening branch; 0.1 here keeps the seal-failure chain (0.6 x 0.1 x not prevented) near the EA 2019 incident base rate"
+ "p_fouled_factor": {
+  "v": 1.0,
+  "src": "Multiplier on the BN parameter p_pv_fouled (0.1, single source for the BN opening branch and the seal-failure chain); design option B uses 0.1 (common-cause fouling of an independent second relief)"
+ },
+ "second_relief": {
+  "v": false,
+  "src": "Design option B: a second relief device on its own nozzle of each digester -> hardware fail-to-open of an isolated digester becomes 1oo2 (beta PFD + PFD^2)"
+ },
+ "pv_dirty_factor": {
+  "v": 1.0,
+  "src": "Multiplier on the NOG-070 fail-to-open PFD for dirty service (foam, sulphur, condensate); sensitivity 5"
  },
  "p_injury_seal": {
   "v": 0.1,
@@ -142,9 +150,33 @@
   "v": 3.0,
   "src": "Assumption: minutes from arrival on the roof to an open manual vent; arrivals within the response bucket R(<= 0.5 h) are taken uniform between 5 and 30 min, so the share arriving too late is t_open / 25"
  },
- "p_seal_kPag": {
-  "v": 10.0,
-  "src": "Seal / manhole failure taken at twice the design pressure of the digester roof (5.0 kPag); the window from the PAH to failure is (10 - 4.8) / (0.266 x 41.2) = 28.5 min"
+ "p_seal_dist": {
+  "v": {
+   "8.0": 0.25,
+   "10.0": 0.5,
+   "12.0": 0.25
+  },
+  "src": "Assumption: pressure (kPag) at which the roof seal / manhole lets go, 1.6-2.4 x the 5.0 kPag design pressure. The window from the PAH (4.8) to failure is computed hour by hour from the rise rate: isolated digester k_iso q(h)/2, shared header k_full q_net(h)"
+ },
+ "k_iso": {
+  "v": 0.266,
+  "src": "Pressure model (Appendix IV): stiffness of one isolated digester headspace, kPa per reference m3"
+ },
+ "k_full": {
+  "v": 0.0803,
+  "src": "Pressure model (Appendix IV): stiffness of the gas side with the inner membrane against the outer one, kPa per reference m3"
+ },
+ "q_net_min": {
+  "v": 5.0,
+  "src": "Lower bound of the net inflow (m3/h) when the holder is full and the consumer still takes 60 m3/h"
+ },
+ "t_resp_min_min": {
+  "v": 5.0,
+  "src": "Assumption: earliest arrival on the roof after an alarm (min); the response CDF rises linearly from here to the BN buckets R(<=0.5 h), R(<=2 h), R(<=8 h)"
+ },
+ "tau_seal_s": {
+  "v": 30.0,
+  "src": "Assumption (as in consequence.py): duration over which the compressed headspace escapes through the failed seal; the H2S dose of a person in that cloud is taken at 3 m for this time"
  },
  "t_vent_manual_min": {
   "v": 15.0,
@@ -152,7 +184,27 @@
  },
  "yH2S_ppm": {
   "v": 2527.0,
-  "src": "PyADM1ODE annual mean of the raw gas (930-5,845 ppm). If the plant desulphurises in the digester headspace (micro-aeration) the PVRV sees 200-500 ppm instead - the single most important composition parameter of the QRA"
+  "src": "PyADM1ODE annual mean of the raw gas (930-5,845 ppm); used when yH2S_mode = mean"
+ },
+ "yH2S_mode": {
+  "v": "hourly",
+  "src": "'hourly': the PyADM1ODE hourly H2S of the raw gas (930-5,845 ppm) at the hour of the release; 'mean': the annual mean 2,527 ppm. With the steep RIVM probit (n = 6.52) the timing of the H2S peaks matters"
+ },
+ "yH2S_scale": {
+  "v": 1.0,
+  "src": "Multiplier on the H2S content; 0.2 represents in-situ desulphurisation in the digester headspace (micro-aeration, about 500 ppm on average)"
+ },
+ "h2s_probit": {
+  "v": "rivm2018",
+  "src": "RIVM (2018-01-17, interim) Pr = -7.87 + 0.31 ln(C^6.52 t), C mg/m3 (1 ppm = 1.417 mg/m3), t min. 'bevi2009' = Pr = -11.5 + ln(C^1.9 t) (C mg/m3), the former Dutch value, kept for comparison"
+ },
+ "conc_factor": {
+  "v": 1.0,
+  "src": "Near-field concentration multiplier: 1 = plume-axis value Q/(pi u sy sz) (reflected, conservative), 0.5 = free plume, 2 = recirculation behind the weather hood or the roof edge"
+ },
+ "beta_entrain": {
+  "v": 0.6,
+  "src": "Entrainment coefficient of the bent-over plume spread (Briggs 0.6); sensitivity 0.4-0.8"
  },
  "duty": {
   "v": {
@@ -161,7 +213,7 @@
    "R3 isolated digester": 0.2921985815602837,
    "R5 blocked PVRV, continuous": 1.0
   },
-  "src": "1-s model: every release is realised as pulses at the minimum stable opening (141 m3/h); duty = time-mean rate / 141. The H2S dose (probit exponent n = 1.9) uses duty x stay at the open-valve concentration, i.e. delta^(1-n) = 2.9x more than a time-mean plume would give for R1"
+  "src": "1-s model: every release is realised as pulses at the minimum stable opening (141 m3/h); duty = time-mean rate / 141. The H2S dose uses duty x stay at the open-valve concentration; with the RIVM exponent n = 6.52 this is delta^(1-n) = 640 times the toxic load of a time-mean plume for R1"
  },
  "generic_f_pvrv": {
   "v": 0.01,

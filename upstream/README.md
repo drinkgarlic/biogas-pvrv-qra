@@ -1,6 +1,6 @@
 # upstream/
 
-Pinned copy of what this repository needs from [biogas-pvrv-BN](https://github.com/drinkgarlic/biogas-pvrv-BN), taken at commit `bc655ef`.
+Pinned copy of what this repository needs from [biogas-pvrv-BN](https://github.com/drinkgarlic/biogas-pvrv-BN), taken at commit `6ec31d6` (BN v4.1: p_pv_fouled 0.1, NOG-070 p_pv_stuck and beta_pv; `pv_bn.py` only changed since `bc655ef`).
 
 | Path | Origin in biogas-pvrv-BN | Used by |
 |---|---|---|

@@ -28,7 +28,7 @@ PARAMS = {
     'pfd_flare':     dict(v=0.05, unit='probability of failure on demand', src='Assumption. Mid value of the IEC 61511 SIL 1 band (0.01-0.1); failure modes (ignition, flame detection, freezing) after Travnicek'),
     'lam_foam':      dict(v=2.0,  unit='per year', src='Kougias 2014 (16 Danish plants, up to 3 per year), Moeller 2012 (7 of 15 plants regularly)'),
     'p_block_foam':  dict(v=0.3,  unit='probability', src='Assumption. EA 2019 incident review (foam blocking PRVs and gas lines)'),
-    'p_pv_fouled':   dict(v=0.3,  unit='probability', src='Assumption. EA 2019 (2012-06 foam blocked the PRV and the roof ruptured; 2013-01 floating layer blocked the PRV)'),
+    'p_pv_fouled':   dict(v=0.1,  unit='probability', src='Assumption (v4.1: 0.3 -> 0.1, the same value as the QRA seal-failure chain). EA 2019 (2012-06 foam blocked the PRV and the roof ruptured; 2013-01 floating layer blocked the PRV). Sensitivity 0.03-0.3'),
     'lam_cond':      dict(v=0.5,  unit='per year', src='Assumption. Condensate pot management failure'),
     'lam_freeze':    dict(v=0.2,  unit='per year (Dec-Feb only)', src='Assumption. ARIA 47807 / 42739 (isolation by freezing, frozen valve)'),
     'lam_xv':        dict(v=0.1,  unit='per year', src='Assumption. Shut-off valve mis-operation / interlock isolation (ARIA 49983)'),
@@ -48,7 +48,8 @@ PARAMS = {
     'pressure_backup': dict(v=True, unit='', src='Whether a pressure-based flare start (PSH) exists. With fill-level start only, False -> no backup in the stuck-vent-valve branch'),
     # ---- optional nodes (defaults have no effect)
     'level_bias':    dict(v={0.0: 1.0}, unit='fill error: probability', src='Assumption. Ultrasonic level indicator error (inner membrane shape). Sensitivity: {-0.05: .25, 0: .5, +0.05: .25}'),
-    'p_pv_stuck':    dict(v=0.0, unit='probability of failure per opening demand', src='Assumption. PVRV stuck (corrosion, freezing). Sensitivity value 0.01'),
+    'p_pv_stuck':    dict(v=0.0048, unit='probability of failure per opening demand (one valve)', src='NOG-070 (2020) Table A.2.1, PSV: lambda_DU 1.1e-6 /h (fail to open before test pressure), annual proof test: PFD = lambda tau / 2 = 4.8e-3. Sensitivities: 2.2e-6 /h (all DU modes), dirty service x5 (foam, sulphur, condensate)'),
+    'beta_pv':       dict(v=0.1,  unit='common-cause factor', src='IEC 61508-6 beta for two identical valves on a shared header (1oo2: PFD = beta PFD + PFD^2); stop / demand / wv branches. Foam / block branches isolate one digester -> one valve'),
     'p_reseat':      dict(v=0.0, unit='probability of reseat failure per opening episode', src='Assumption. Seat fouling. Sensitivity value 0.05'),
     'Q_leak':        dict(v=20.0, unit='m3/h', src='Assumption. Leak rate after a reseat failure'),
     't_leak_h':      dict(v=12.0, unit='h', src='Assumption. Mean time until a leak is found and fixed'),
@@ -103,7 +104,7 @@ def slice_inference(case, q, fill, p_atm, demand, day, winter, prm, wv_prob):
                 end = min(D, t_on + e)                # downstream recovery or flare recovery, whichever is first
                 if t_open < end:
                     w = pb * pD * pe * pfd
-                    op = (recov_op.get(e, 0.0) / pe) if (t_on + e <= D) else 0.0     # share of this weight where the operator finds the valve venting
+                    op = (recov_op.get(e, 0.0) / pe) if (t_on + e <= D and pe > 0) else 0.0     # share of this weight where the operator finds the valve venting
                     po += w; vent += w * (end - t_open) * q; dur += w * (end - t_open); iv.append((w, t_open, end, op))
     out['stop'] = (p_stop, po, vent, dur, iv)
     # --- flare demand (indicated f_on = true fill f_on + bias): the consumer keeps taking 60 -> only the surplus (q - use) raises the holder and the pressure
@@ -114,7 +115,7 @@ def slice_inference(case, q, fill, p_atm, demand, day, winter, prm, wv_prob):
             t_o = float(ph.t_full_h(f0, q - use, p_atm, case) + ph.t_rigid_h(case, q - use))
             for e, pe in recov.items():
                 if t_o < e:
-                    w = pb * pe * pfd; po += w; vent += w * (e - t_o) * (q - use); dur += w * (e - t_o); iv.append((w, t_o, e, recov_op.get(e, 0.0) / pe))
+                    w = pb * pe * pfd; po += w; vent += w * (e - t_o) * (q - use); dur += w * (e - t_o); iv.append((w, t_o, e, recov_op.get(e, 0.0) / pe if pe > 0 else 0.0))
         out['demand'] = (float(demand), po, vent, dur, iv)
     else:
         out['demand'] = (0.0, 0.0, 0.0, 0.0, [])
@@ -170,6 +171,16 @@ def run_year(case, inp, prm=PARAMS, occupancy=False):
         for k in occ_k: df[f's_{k}'] = occ_k[k][:n]   # ... by initiating event
     return df
 
+def pv_pfd(prm=PARAMS):
+    """PFD of the relief on demand: shared header (two valves, 1oo2 with common cause) and an isolated digester (one valve)"""
+    p = prm['p_pv_stuck']['v']; b = prm['beta_pv']['v']
+    return dict(shared=b * p + ((1 - b) * p) ** 2, single=p)
+
+def pv_overpressure(df, prm=PARAMS):
+    """overpressure events per year because the PVRV does not open when it should (hardware), from the hourly opening demands"""
+    f = pv_pfd(prm)
+    return float(df[['p_stop', 'p_demand', 'p_wv']].sum().sum() * f['shared'] + df[['p_foam', 'p_block']].sum().sum() * f['single'])
+
 def summarize(df, prm=PARAMS):
     s = {}
     for k in ('stop', 'demand', 'foam', 'block', 'wv'):
@@ -178,7 +189,8 @@ def summarize(df, prm=PARAMS):
     s['total'] = dict(openings_per_yr=tot, vent_m3_per_yr=df['v_open'].sum(), open_h_per_yr=df['d_open'].sum(),
                       ch4_kg_per_yr=df['ch4_kg'].sum(), P_at_least_one_per_yr=1 - np.exp(-tot),
                       chatter_cycles_per_yr=df['d_open'].sum() * prm['chatter_per_h']['v'],
-                      pv_stuck_overpressure_per_yr=tot * prm['p_pv_stuck']['v'],
+                      pv_stuck_overpressure_per_yr=pv_overpressure(df, prm),
+                      pv_fouled_overpressure_per_yr=prm['lam_foam']['v'] * prm['p_block_foam']['v'] * prm['p_pv_fouled']['v'],
                       reseat_fail_per_yr=tot * prm['p_reseat']['v'],
                       reseat_leak_m3_per_yr=tot * prm['p_reseat']['v'] * prm['Q_leak']['v'] * prm['t_leak_h']['v'])
     return s

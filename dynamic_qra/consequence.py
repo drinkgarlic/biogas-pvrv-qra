@@ -15,7 +15,10 @@ Models (all analytical, documented so that PHAST / ALOHA can be used as a cross-
      buoyant mixing and gives much longer distances).
 Effects
   * flash fire: a person inside the LFL contour at ignition -> fatality probability 1 (TNO Green Book, outdoors)
-  * H2S: RIVM probit Pr = -11.5 + 1.0 ln(C^1.9 t)  (C in ppm, t in min)
+  * H2S: RIVM (2018, interim) probit Pr = -7.87 + 0.31 ln(C^6.52 t), C in mg/m3, t in min (validity of the data 1-60 min).
+    The ppm values of the plume model are converted with 34.08 / 24.06 = 1.417 mg/m3 per ppm (20 C, 1 atm).
+    The former Bevi (2009) probit Pr = -11.5 + ln(C^1.9 t) (C in mg/m3) is kept as model='bevi2009' for comparison;
+    up to v1.0 of this repository it was applied, wrongly, with C in ppm.
 Outputs: out/effect_distances.csv (per release type x weather), fig/consequence.png
 """
 import os, json, math
@@ -42,7 +45,7 @@ def sig(x, cls):
     return a * x * (1 + b * x) ** c, d * x * (1 + e * x) ** f
 
 G1 = G * (RHO_A - RHO_G) / RHO_A                           # reduced gravity of the buoyant gas (m/s2)
-def plume_centreline(Q, u, cls, x, r0=D_VENT / 2, beta=0.6):
+def plume_centreline(Q, u, cls, x, r0=D_VENT / 2, beta=0.6, factor=1.0):
     """volume fraction on the plume axis at downwind distance x (m); Q in m3/s, u in m/s.
     sigma = sqrt(sigma_PG^2 + sigma_plume^2 + (r0/2)^2), sigma_plume = beta * z_rise / sqrt(2), z_rise = 1.6 B^(1/3) x^(2/3) / u (Briggs)."""
     x = np.asarray(x, float)
@@ -51,16 +54,16 @@ def plume_centreline(Q, u, cls, x, r0=D_VENT / 2, beta=0.6):
     sp = beta * z_rise / math.sqrt(2)
     sy0, sz0 = sig(np.maximum(x, 1e-3), cls)
     sy = np.sqrt(sy0 ** 2 + sp ** 2 + (r0 / 2) ** 2); sz = np.sqrt(sz0 ** 2 + sp ** 2 + (r0 / 2) ** 2)
-    return np.minimum(1.0, Q / (math.pi * u * sy * sz))
+    return np.minimum(1.0, factor * Q / (math.pi * u * sy * sz))      # factor 0.5 = free plume 1/(2 pi); 1 = the base (axis value doubled, roof reflection); 2 = recirculation behind the hood / roof edge
 
 def plume_sigma(Q, u, cls, x, r0=D_VENT / 2, beta=0.6):
     B = G1 * Q; z_rise = 1.6 * B ** (1 / 3) * x ** (2 / 3) / u; sp = beta * z_rise / math.sqrt(2)
     sy0, sz0 = sig(max(x, 1e-3), cls)
     return math.sqrt(sy0 ** 2 + sp ** 2 + (r0 / 2) ** 2), math.sqrt(sz0 ** 2 + sp ** 2 + (r0 / 2) ** 2), z_rise
 
-def dist_to(Cstar, Q, u, cls, xmax=200.0):
+def dist_to(Cstar, Q, u, cls, xmax=200.0, **kw):
     """downwind distance where the centreline concentration falls to Cstar (vol fraction); 0 if already below at the vent"""
-    x = np.logspace(-2, math.log10(xmax), 2000); c = plume_centreline(Q, u, cls, x)
+    x = np.logspace(-2, math.log10(xmax), 2000); c = plume_centreline(Q, u, cls, x, **kw)
     if c[0] < Cstar: return 0.0
     i = np.argmax(c < Cstar)
     return float(x[i]) if i > 0 else xmax
@@ -82,11 +85,22 @@ def puff_peak(V0, u, cls, t, r0):
     sy = np.sqrt((0.5 * sy) ** 2 + (r0 / 2) ** 2); sz = np.sqrt((0.5 * sz) ** 2 + (r0 / 2) ** 2); sx = sy
     return np.minimum(1.0, V0 / ((2 * math.pi) ** 1.5 * sx * sy * sz)), x
 
-def h2s_probit_fatality(C_ppm, t_min):
-    """RIVM (2009) probit for H2S: Pr = -11.5 + ln(C^1.9 t); fatality probability = Phi(Pr - 5)"""
-    C = np.maximum(np.asarray(C_ppm, float), 1e-9)
-    Pr = -11.5 + np.log(C ** 1.9 * t_min)
+MG_PER_PPM_H2S = 34.08 / 24.06                         # mg/m3 per ppm at 20 C
+PROBIT_H2S = {'rivm2018': (-7.87, 0.31, 6.52),            # RIVM 2018-01-17 interim, C mg/m3, t min
+              'bevi2009': (-11.5, 1.0, 1.9)}              # Reference Manual Bevi 3.2 (2009), C mg/m3, t min
+PROBIT_MODEL = 'rivm2018'
+def h2s_probit_fatality(C_ppm, t_min, model=None):
+    """fatality probability Phi(Pr - 5) for H2S at C_ppm (converted to mg/m3) over t_min minutes"""
+    a, b, n = PROBIT_H2S[model or PROBIT_MODEL]
+    C = np.maximum(np.asarray(C_ppm, float) * MG_PER_PPM_H2S, 1e-9); t = np.maximum(np.asarray(t_min, float), 1e-6)
+    Pr = a + b * (n * np.log(C) + np.log(t))
     return norm.cdf(Pr - 5.0)
+
+def h2s_lc(P, t_min, model=None):
+    """concentration (ppm) giving fatality probability P after t_min minutes"""
+    a, b, n = PROBIT_H2S[model or PROBIT_MODEL]
+    lnC = ((norm.ppf(P) + 5.0 - a) / b - math.log(t_min)) / n
+    return math.exp(lnC) / MG_PER_PPM_H2S
 
 # --------------------------------------------------------------------------- scenarios x weather
 def main():
@@ -139,10 +153,13 @@ def main():
 
     # H2S fatality probability at 1 m and 3 m for typical exposure times
     tab = []
-    for t in (2, 5, 10):
-        for C in (200, 500, 1000, 2500):
-            tab.append(dict(t_min=t, C_ppm=C, P_fatal=float(h2s_probit_fatality(C, t))))
-    ht = pd.DataFrame(tab).pivot(index='C_ppm', columns='t_min', values='P_fatal'); ht.to_csv(os.path.join(OUT, 'h2s_probit_table.csv'), float_format='%.4f'); print(ht.round(4))
+    for model in ('rivm2018', 'bevi2009'):
+        for t in (1, 2, 5, 10, 30):
+            for C in (100, 200, 300, 500, 1000, 2500):
+                tab.append(dict(model=model, t_min=t, C_ppm=C, P_fatal=float(h2s_probit_fatality(C, t, model))))
+    ht = pd.DataFrame(tab).pivot(index=['model', 'C_ppm'], columns='t_min', values='P_fatal'); ht.to_csv(os.path.join(OUT, 'h2s_probit_table.csv'), float_format='%.4g'); print(ht.round(4))
+    lc = pd.DataFrame([dict(model=m, t_min=t, LC01_ppm=h2s_lc(0.01, t, m), LC50_ppm=h2s_lc(0.5, t, m)) for m in ('rivm2018', 'bevi2009') for t in (1, 5, 10, 30, 60)])
+    lc.to_csv(os.path.join(OUT, 'h2s_lc_table.csv'), index=False, float_format='%.4g'); print(lc.round(1).to_string(index=False))
 
     # --------------------------------------------------------------------------- figure
     import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt
