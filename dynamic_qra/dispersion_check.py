@@ -78,7 +78,8 @@ def mass_balance(sy, sz, u, h=H_S, images=2):
     """integral of u C dy dz over y in R, z >= 0, divided by Q"""
     y = np.linspace(-8 * sy, 8 * sy, 801); z = np.linspace(0, h + 8 * sz, 1601); Y, Z = np.meshgrid(y, z)
     c = Q / (2 * math.pi * u * sy * sz) * np.exp(-Y ** 2 / (2 * sy ** 2)) * (np.exp(-(Z - h) ** 2 / (2 * sz ** 2)) + (np.exp(-(Z + h) ** 2 / (2 * sz ** 2)) if images == 2 else 0))
-    return float(np.trapezoid(np.trapezoid(c, y, axis=1), z) * u / Q)
+    trap = getattr(np, "trapezoid", None) or np.trapz              # numpy < 2.0 has only trapz
+    return float(trap(trap(c, y, axis=1), z) * u / Q)
 
 def main():
     pd.set_option('display.width', 250); pd.set_option('display.max_columns', 30)
