@@ -97,7 +97,7 @@ def slice_inference(case, q, fill, p_atm, demand, day, winter, prm, wv_prob):
     t_open = float(ph.t_full_h(fill, q, p_atm, case) + ph.t_rigid_h(case, q))
     po = 0.0; vent = 0.0; dur = 0.0; iv = []
     for b, pb in bias.items():
-        fon = min(f_on + b, 0.999)
+        fon = min(f_on + b, 1.0)                 # v4.2: the flare is demanded at the indicated fill itself (100 % = holder just full), as in the 1-s model
         t_on = (fon - fill) * ph.V_MAX * (p_atm + ph.P_OP[case]) / ph.P_REF / q if fill < fon else 0.0
         for D, pD in prm['D_dist']['v'].items():
             for e, pe in recov.items():
@@ -111,7 +111,7 @@ def slice_inference(case, q, fill, p_atm, demand, day, winter, prm, wv_prob):
     if demand > 0 and q > use:
         po = vent = dur = 0.0; iv = []
         for b, pb in bias.items():
-            f0 = min(f_on + b, 0.999)
+            f0 = min(f_on + b, 1.0)              # v4.2: was 0.999, which added the time to fill the last 0.5 m3 (1-2 min) before the rigid phase
             t_o = float(ph.t_full_h(f0, q - use, p_atm, case) + ph.t_rigid_h(case, q - use))
             for e, pe in recov.items():
                 if t_o < e:

@@ -94,10 +94,12 @@ Models screened out, with the reason recorded in the code: **jet fire** (flame F
 
 | Case | Flare start | PVRV openings /yr | PLL, responders + routine /yr | IR, most exposed individual /yr | ignition-failure chatter (PLL) | digester isolation (foam, condensate, freezing) | no relief → manual vent / seal failure (fouled + hardware) | routine roof work | H₂S share of PLL | CH₄ vented kg/yr |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1 (4.0 kPag) | 100 % | 81.5 | 3.7 × 10⁻² | 1.3 × 10⁻² | 2.0 × 10⁻² | 1.1 × 10⁻² | 3.8 × 10⁻³ | 1.3 × 10⁻³ | 97 % | 318 |
+| 1 (4.0 kPag) | 100 % | 83.1 | 3.7 × 10⁻² | 1.3 × 10⁻² | 2.1 × 10⁻² | 1.1 × 10⁻² | 3.8 × 10⁻³ | 1.3 × 10⁻³ | 97 % | 336 |
 | 1 (4.0 kPag) | 80 % | 1.40 | 1.6 × 10⁻² | 5.5 × 10⁻³ | ~0 | 1.1 × 10⁻² | 3.8 × 10⁻³ | 4.5 × 10⁻⁴ | 94 % | 69 |
-| 3 (2.0 kPag) | 100 % | 2.86 | 1.5 × 10⁻² | 5.1 × 10⁻³ | ~0 | 1.1 × 10⁻² | 3.8 × 10⁻³ | 1.8 × 10⁻⁴ | 94 % | 70 |
+| 3 (2.0 kPag) | 100 % | 2.88 | 1.5 × 10⁻² | 5.1 × 10⁻³ | ~0 | 1.1 × 10⁻² | 3.8 × 10⁻³ | 1.8 × 10⁻⁴ | 94 % | 71 |
 | 3 (2.0 kPag) | 80 % | 1.31 | 1.5 × 10⁻² | 5.1 × 10⁻³ | ~0 | 1.1 × 10⁻² | 3.8 × 10⁻³ | 1.7 × 10⁻⁴ | 93 % | 64 |
+
+**v1.2 (2026-10-26): BN v4.2 pinned.** The BN now demands the flare when the holder is just full instead of at 99.9 % fill. Only the flare-start-100 % cases move: Case 1 openings 81.5 → 83.1, CH₄ 318 → 336 kg, PLL 3.68 → 3.73 × 10⁻², IR 1.31 → 1.33 × 10⁻²; the 80 % cases are unchanged.
 
 **v1.1 (2026-10-21): the H₂S probit.** Up to v1.0 the H₂S fatality used the Bevi (2009) constants (−11.5, 1, 1.9) with the concentration in **ppm**, whereas they are defined for mg/m³; the same constants with the right unit give about twice the toxic load (1.417^1.9), and the RIVM (2018, interim) probit Pr = −7.87 + 0.31 ln(C^6.52 t) (C mg/m³, t min; 30-min LC50 ≈ 244 ppm, LC01 ≈ 77 ppm) is much steeper still. The v1.0 results (PLL 1.1–1.3 × 10⁻³, IR 3.8–5.1 × 10⁻⁴, blocked-PVRV chain 78–93 %) were therefore driven by an H₂S term that was close to zero. With the RIVM probit the plume at 1 m from an open valve (several hundred to 1,400 ppm H₂S) is lethal within one to two minutes of the pulsed exposure, and H₂S becomes 93–97 % of the PLL. The Bevi (2009) value with the correct unit gives 1.1–1.5 × 10⁻³ — the choice of probit is now the largest single uncertainty, and RIVM itself calls its 2018 function interim. The same revision unified the PVRV fouling probability (BN 0.3 → 0.1, now read from the BN), added the NOG-070 hardware fail-to-open branch, made the seal-failure window depend on the hour, used the hourly H₂S of the raw gas, added H₂S in the seal-failure cloud, and added the static QRA, the near-field and entrainment sensitivities.
 

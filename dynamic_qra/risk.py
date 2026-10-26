@@ -2,7 +2,7 @@
 """
 Dynamic QRA, stage 3: event tree after "PVRV opens" (or fails to open) and the time-resolved risk integration.
 
-Frequency side  : the hourly BN results (upstream/bayesian_network/pv_bn.py, v4.1, pinned from biogas-pvrv-BN) give, per hour h and initiating event k,
+Frequency side  : the hourly BN results (upstream/bayesian_network/pv_bn.py, v4.2, pinned from biogas-pvrv-BN) give, per hour h and initiating event k,
                     p_k(h)  probability that an event starting in hour h opens the valve
                     o_k(h)  ... and that the operator reaches the valve while it is still venting
                     s_k(h)  probability that the valve is open during hour h (state probability)
