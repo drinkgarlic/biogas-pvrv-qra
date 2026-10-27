@@ -2,7 +2,7 @@
 """
 Dynamic QRA, stage 3: event tree after "PVRV opens" (or fails to open) and the time-resolved risk integration.
 
-Frequency side  : the hourly BN results (upstream/bayesian_network/pv_bn.py, v4.2, pinned from biogas-pvrv-BN) give, per hour h and initiating event k,
+Frequency side  : the hourly BN results (upstream/bayesian_network/pv_bn.py, v4.3, pinned from biogas-pvrv-BN) give, per hour h and initiating event k,
                     p_k(h)  probability that an event starting in hour h opens the valve
                     o_k(h)  ... and that the operator reaches the valve while it is still venting
                     s_k(h)  probability that the valve is open during hour h (state probability)
@@ -195,7 +195,7 @@ def bn_year(case, f_on, prm_over=None):
     key = (case, f_on, json.dumps(prm_over or {}, sort_keys=True, default=str))
     if key not in _BN:
         prm = copy.deepcopy(bn.PARAMS); prm['f_on']['v'] = f_on; prm['t_retry_h']['v'] = 0.5; prm['n_retry']['v'] = 4; prm['pressure_backup']['v'] = False
-        tag = f'onoff_f{int(round(f_on * 100))}'; prm['fill_series']['v'] = f'fill_hourly_{tag}.csv'; prm['demand_series']['v'] = f'flare_demands_{tag}.csv'
+        tag = f'onoff_c{case}_f{int(round(f_on * 100))}'; prm['fill_series']['v'] = f'fill_hourly_{tag}.csv'; prm['demand_series']['v'] = f'flare_demands_{tag}.csv'   # v1.3: 1-s model series per Case
         for k, v in (prm_over or {}).items(): prm[k]['v'] = v
         inp = bn.load_inputs(prm=prm)
         _BN[key] = (prm, inp, bn.run_year(case, inp, prm, occupancy=True))
