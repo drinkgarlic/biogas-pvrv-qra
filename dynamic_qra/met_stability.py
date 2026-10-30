@@ -14,8 +14,8 @@ Method
               (a corrected index below 1 is set to 1); 10/10 with ceiling < 7,000 ft gives 0 (neutral)
       night : 10/10 with ceiling < 7,000 ft gives 0; total cloud > 4/10: -1; <= 4/10: -2
       class : Turner's table of net radiation index vs wind speed in knots; class G is merged with F
-  * Cross-check for daytime: the solar-radiation / wind-speed scheme (strong > 0.6 kW/m2, moderate 0.3-0.6, slight < 0.3) with the
-    KMA hourly global radiation; agreement is reported.
+  * Cross-check for daytime: the EPA solar-radiation / wind-speed (SRDT) scheme (EPA-454/R-99-005, table 6-7: 925 / 675 / 175 W/m2)
+    with the KMA hourly global radiation; agreement is reported.
   * Wind at the vent height (18.25 m) from the 10-m wind with the ISC rural power-law exponents (A-F: .07 .07 .10 .15 .35 .55).
   * Calm: 10-m wind below 0.5 m/s (the KMA record reports calms as 0.0); these hours go to the calm-air (MTT) plume.
   * Missing hours (the download ends at 2021-10-31 00:00, 24 h short of the study year) are filled with the same hour of the previous day
@@ -95,11 +95,13 @@ def turner_class(elev, cloud, ceil_m, u10):
     return np.array(out), nri
 
 def srdt_day_class(rad_kw, u10):
-    """daytime cross-check: solar radiation / wind speed scheme (Pasquill's insolation categories with measured radiation)"""
-    ins = np.where(rad_kw > 0.6, 'strong', np.where(rad_kw > 0.3, 'moderate', 'slight'))
-    tab = {'strong': ['A', 'A', 'B', 'C', 'C'], 'moderate': ['A', 'B', 'B', 'C', 'D'], 'slight': ['B', 'C', 'C', 'D', 'D']}
+    """daytime cross-check: EPA solar-radiation / wind-speed (SRDT) scheme, EPA-454/R-99-005 (2000) table 6-7:
+    radiation >= 925, 675-925, 175-675, < 175 W/m2 x wind < 2, 2-3, 3-5, 5-6, >= 6 m/s"""
+    rad = np.asarray(rad_kw) * 1000.0
+    ri = np.where(rad >= 925, 0, np.where(rad >= 675, 1, np.where(rad >= 175, 2, 3)))
+    tab = [['A', 'A', 'B', 'D'], ['A', 'B', 'C', 'D'], ['B', 'B', 'C', 'D'], ['C', 'C', 'D', 'D'], ['C', 'D', 'D', 'D']]   # rows: wind bins
     ub = np.digitize(u10, [2, 3, 5, 6])
-    return np.array([tab[i][j] for i, j in zip(ins, ub)])
+    return np.array([tab[j][i] for i, j in zip(ri, ub)])
 
 def build(year_index=None):
     m = pd.read_csv(MET_CSV, parse_dates=['datetime']).set_index('datetime')

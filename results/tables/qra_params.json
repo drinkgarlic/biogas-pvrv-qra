@@ -194,6 +194,14 @@
   "v": 1.0,
   "src": "Multiplier on the H2S content; 0.2 represents in-situ desulphurisation in the digester headspace (micro-aeration, about 500 ppm on average)"
  },
+ "comp_mode": {
+  "v": "hourly",
+  "src": "'hourly': CH4, CO2 and H2O of the raw gas from PyADM1ODE hour by hour (buoyancy, LFL, CO2 dose); 'mean': the annual mean (CH4 64.0 %, CO2 30.2 %, H2O 5.8 %)"
+ },
+ "co2_tox": {
+  "v": true,
+  "src": "CO2 toxicity included: HSE dangerous toxic loads (n = 8) SLOT 1.5e40 / SLOD 1.5e41 ppm^8 min as a probit (SLOT = 1 %, SLOD = 50 %); combined with H2S as independent action, P = 1 - (1 - P_H2S)(1 - P_CO2)"
+ },
  "h2s_probit": {
   "v": "rivm2018",
   "src": "RIVM (2018-01-17, interim) Pr = -7.87 + 0.31 ln(C^6.52 t), C mg/m3 (1 ppm = 1.417 mg/m3), t min. 'bevi2009' = Pr = -11.5 + ln(C^1.9 t) (C mg/m3), the former Dutch value, kept for comparison"

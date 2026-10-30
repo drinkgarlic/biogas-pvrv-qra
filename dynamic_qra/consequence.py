@@ -45,11 +45,16 @@ def sig(x, cls):
     return a * x * (1 + b * x) ** c, d * x * (1 + e * x) ** f
 
 G1 = G * (RHO_A - RHO_G) / RHO_A                           # reduced gravity of the buoyant gas (m/s2)
-def plume_centreline(Q, u, cls, x, r0=D_VENT / 2, beta=0.6, factor=1.0):
+def g_reduced(rho_gas=None):
+    """reduced gravity (m/s2) of the vented gas; rho_gas = density at 35 C of the composition of that hour (default: annual mean)"""
+    return G1 if rho_gas is None else G * (RHO_A - rho_gas) / RHO_A
+
+def plume_centreline(Q, u, cls, x, r0=D_VENT / 2, beta=0.6, factor=1.0, g1=None):
     """volume fraction on the plume axis at downwind distance x (m); Q in m3/s, u in m/s.
-    sigma = sqrt(sigma_PG^2 + sigma_plume^2 + (r0/2)^2), sigma_plume = beta * z_rise / sqrt(2), z_rise = 1.6 B^(1/3) x^(2/3) / u (Briggs)."""
+    sigma = sqrt(sigma_PG^2 + sigma_plume^2 + (r0/2)^2), sigma_plume = beta * z_rise / sqrt(2), z_rise = 1.6 B^(1/3) x^(2/3) / u (Briggs).
+    g1: reduced gravity of the gas of that hour (default: annual-mean composition)"""
     x = np.asarray(x, float)
-    B = G1 * Q
+    B = (G1 if g1 is None else g1) * Q
     z_rise = 1.6 * B ** (1 / 3) * x ** (2 / 3) / u
     sp = beta * z_rise / math.sqrt(2)
     sy0, sz0 = sig(np.maximum(x, 1e-3), cls)
@@ -61,16 +66,16 @@ def plume_sigma(Q, u, cls, x, r0=D_VENT / 2, beta=0.6):
     sy0, sz0 = sig(max(x, 1e-3), cls)
     return math.sqrt(sy0 ** 2 + sp ** 2 + (r0 / 2) ** 2), math.sqrt(sz0 ** 2 + sp ** 2 + (r0 / 2) ** 2), z_rise
 
-def dist_to(Cstar, Q, u, cls, xmax=200.0, **kw):
+def dist_to(Cstar, Q, u, cls, xmax=200.0, **kw):  # kw: r0, beta, factor, g1
     """downwind distance where the centreline concentration falls to Cstar (vol fraction); 0 if already below at the vent"""
     x = np.logspace(-2, math.log10(xmax), 2000); c = plume_centreline(Q, u, cls, x, **kw)
     if c[0] < Cstar: return 0.0
     i = np.argmax(c < Cstar)
     return float(x[i]) if i > 0 else xmax
 
-def mtt_plume(Q, z, alpha=0.1):
+def mtt_plume(Q, z, alpha=0.1, g1=None):
     """calm air, pure buoyant plume (Morton-Taylor-Turner, Gaussian profiles): centreline volume fraction and 1/e radius at height z above the vent"""
-    g1 = G * (RHO_A - RHO_G) / RHO_A                      # reduced gravity (m/s2), gas lighter than air
+    g1 = G * (RHO_A - RHO_G) / RHO_A if g1 is None else g1   # reduced gravity (m/s2), gas lighter than air
     B = g1 * Q                                            # buoyancy flux (m4/s3)
     z = np.maximum(np.asarray(z, float), 0.3)
     b = 6 * alpha / 5 * z                                 # plume radius (top-hat), m
@@ -95,6 +100,17 @@ def h2s_probit_fatality(C_ppm, t_min, model=None):
     C = np.maximum(np.asarray(C_ppm, float) * MG_PER_PPM_H2S, 1e-9); t = np.maximum(np.asarray(t_min, float), 1e-6)
     Pr = a + b * (n * np.log(C) + np.log(t))
     return norm.cdf(Pr - 5.0)
+
+# CO2: HSE dangerous toxic loads (n = 8, ppm^8 min): SLOT 1.5e40, SLOD 1.5e41 (HSE, Assessment of the dangerous toxic load for
+# specified level of toxicity and significant likelihood of death). Written as a probit with SLOD = 50 % and SLOT taken as 1 %:
+# Pr = a + b ln(C^8 t), b = 2.326 / ln 10, a = 5 - b ln(1.5e41). 1 h: SLOT 6.3 %, SLOD 8.4 %; 10 min: 7.9 % / 10.5 %.
+CO2_N, CO2_SLOT, CO2_SLOD = 8.0, 1.5e40, 1.5e41
+CO2_B = (5.0 - (5.0 + norm.ppf(0.01))) / math.log(CO2_SLOD / CO2_SLOT); CO2_A = 5.0 - CO2_B * math.log(CO2_SLOD)
+CO2_AMBIENT_PPM = 420.0
+def co2_probit_fatality(C_ppm, t_min):
+    """fatality probability for CO2 at C_ppm (excess over ambient added inside) over t_min minutes (HSE SLOT/SLOD as a probit)"""
+    C = np.maximum(np.asarray(C_ppm, float) + CO2_AMBIENT_PPM, 1.0); t = np.maximum(np.asarray(t_min, float), 1e-6)
+    return norm.cdf(CO2_A + CO2_B * (CO2_N * np.log(C) + np.log(t)) - 5.0)
 
 def h2s_lc(P, t_min, model=None):
     """concentration (ppm) giving fatality probability P after t_min minutes"""

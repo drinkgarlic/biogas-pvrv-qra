@@ -74,6 +74,8 @@ QRA = {
     'yH2S_ppm':      dict(v=2527.0, src='PyADM1ODE annual mean of the raw gas (930-5,845 ppm); used when yH2S_mode = mean'),
     'yH2S_mode':     dict(v='hourly', src="'hourly': the PyADM1ODE hourly H2S of the raw gas (930-5,845 ppm) at the hour of the release; 'mean': the annual mean 2,527 ppm. With the steep RIVM probit (n = 6.52) the timing of the H2S peaks matters"),
     'yH2S_scale':    dict(v=1.0, src='Multiplier on the H2S content; 0.2 represents in-situ desulphurisation in the digester headspace (micro-aeration, about 500 ppm on average)'),
+    'comp_mode':     dict(v='hourly', src="'hourly': CH4, CO2 and H2O of the raw gas from PyADM1ODE hour by hour (buoyancy, LFL, CO2 dose); 'mean': the annual mean (CH4 64.0 %, CO2 30.2 %, H2O 5.8 %)"),
+    'co2_tox':       dict(v=True, src='CO2 toxicity included: HSE dangerous toxic loads (n = 8) SLOT 1.5e40 / SLOD 1.5e41 ppm^8 min as a probit (SLOT = 1 %, SLOD = 50 %); combined with H2S as independent action, P = 1 - (1 - P_H2S)(1 - P_CO2)'),
     'h2s_probit':    dict(v='rivm2018', src="RIVM (2018-01-17, interim) Pr = -7.87 + 0.31 ln(C^6.52 t), C mg/m3 (1 ppm = 1.417 mg/m3), t min. 'bevi2009' = Pr = -11.5 + ln(C^1.9 t) (C mg/m3), the former Dutch value, kept for comparison"),
     'conc_factor':   dict(v=1.0, src='Near-field concentration multiplier: 1 = plume-axis value Q/(pi u sy sz) (reflected, conservative), 0.5 = free plume, 2 = recirculation behind the weather hood or the roof edge'),
     'beta_entrain':  dict(v=0.6, src='Entrainment coefficient of the bent-over plume spread (Briggs 0.6); sensitivity 0.4-0.8'),
@@ -113,21 +115,35 @@ def wx_weights(P, day, dt):
 
 # ----------------------------------------------------------------------------- plume geometry (cached; concentrations scale with the H2S content)
 _GEO = {}
-def geometry(Qh, wname, P):
-    """(C at 1 m, C at the LSIR distance, C at 3 m: all biogas volume fractions on the plume axis; LFL distance m) for a continuous release Qh m3/h"""
+COMP_STEP = 0.01                                                                  # composition bins: CH4 mole fraction in steps of 1 %
+def comp_props(cb):
+    """(reduced gravity, LFL) of the gas in composition bin cb = (yCH4, yCO2, yH2O) rounded; None = annual mean"""
+    if cb is None: return None, cq.LFL
+    yC, yD, yW = cb; Mg = yC * 0.016043 + yD * 0.044010 + yW * 0.018015 + (1 - yC - yD - yW) * 0.034081
+    rho = 101325 * Mg / (8.314462 * 308.15)
+    return cq.g_reduced(rho), 0.05 / yC
+
+def geometry(Qh, wname, P, cb=None):
+    """(C at 1 m, C at the LSIR distance, C at 3 m: all biogas volume fractions on the plume axis; LFL distance m) for a continuous release Qh m3/h,
+    with the buoyancy and LFL of composition bin cb (None: annual mean)"""
     f, be, xd = P['conc_factor']['v'], P['beta_entrain']['v'], P['lsir_distance_m']['v']
-    key = (round(Qh, 3), wname, f, be, xd)
+    key = (round(Qh, 3), wname, f, be, xd, cb)
     if key not in _GEO:
-        cls, u = WX[wname]; Q = Qh / 3600
+        cls, u = WX[wname]; Q = Qh / 3600; g1, lfl = comp_props(cb)
         if cls is None:
-            c = lambda z: min(1.0, f * float(cq.mtt_plume(Q, z)[0]))
-            z = np.linspace(0.3, 30, 300); cz = np.minimum(1.0, f * cq.mtt_plume(Q, z)[0])
-            xl = float(z[np.argmax(cz < cq.LFL)]) if (cz < cq.LFL).any() else 30.0
+            c = lambda z: min(1.0, f * float(cq.mtt_plume(Q, z, g1=g1)[0]))
+            z = np.linspace(0.3, 30, 300); cz = np.minimum(1.0, f * cq.mtt_plume(Q, z, g1=g1)[0])
+            xl = float(z[np.argmax(cz < lfl)]) if (cz < lfl).any() else 30.0
         else:
-            kw = dict(factor=f, beta=be)
-            c = lambda x: float(cq.plume_centreline(Q, u, cls, x, **kw)); xl = cq.dist_to(cq.LFL, Q, u, cls, **kw)
+            kw = dict(factor=f, beta=be, g1=g1)
+            c = lambda x: float(cq.plume_centreline(Q, u, cls, x, **kw)); xl = cq.dist_to(lfl, Q, u, cls, **kw)
         _GEO[key] = (c(1.0), c(xd), c(3.0), xl)
     return _GEO[key]
+
+def geo_hourly(Qh, wname, P, comp):
+    """the four geometry values hour by hour (arrays) for the composition bins of the year"""
+    vals = np.array([geometry(Qh, wname, P, cb) for cb in comp['bins']])            # (n_bins, 4)
+    return [vals[comp['idx'], j] for j in range(4)]
 
 def effects(Q_m3h, wname, yH2S=None, P=None):
     """(C at 1 m vol fraction, H2S ppm at 1 m, LFL distance) for a continuous release Q at the vent in weather class wname"""
@@ -137,6 +153,25 @@ def effects(Q_m3h, wname, yH2S=None, P=None):
 
 def probit(C_ppm, t_min, P):
     return cq.h2s_probit_fatality(C_ppm, np.maximum(t_min, 0.1), P['h2s_probit']['v'])
+
+def tox(c, t_min, y, yco2, P):
+    """(fatality H2S + CO2 combined as independent action, H2S alone) for biogas fraction c over t_min minutes"""
+    ph = probit(c * y, t_min, P)
+    if not P['co2_tox']['v']: return ph, ph
+    pc = cq.co2_probit_fatality(c * yco2 * 1e6, np.maximum(t_min, 0.1))
+    return 1 - (1 - ph) * (1 - pc), ph
+
+def comp_series(P, n, static=False):
+    """hourly composition of the raw gas: yCH4, yCO2 (mole fractions) and the composition bins used for the plume geometry"""
+    d = pd.read_csv(bn.ADM1_CSV).iloc[:n]
+    C = d['CH4_wet_pct'].to_numpy() / 100; D = d['CO2_wet_pct'].to_numpy() / 100; W = d['H2O_wet_pct'].to_numpy() / 100
+    if P['comp_mode']['v'] != 'hourly' or static:
+        C, D, W = (np.full(n, a.mean()) for a in (C, D, W))
+    key = np.round(C / COMP_STEP) * COMP_STEP
+    bins, idx = np.unique(key, return_inverse=True)
+    bins_t = [(float(b), float(D[idx == i].mean()), float(W[idx == i].mean())) for i, b in enumerate(bins)]
+    if P['comp_mode']['v'] != 'hourly' and not static: bins_t = [None]; idx = np.zeros(n, int)
+    return dict(yCH4=C, yCO2=D, bins=bins_t, idx=idx)
 
 def h2s_series(P, n):
     """H2S of the raw gas (ppm) hour by hour"""
@@ -172,18 +207,19 @@ def overpressure_chain(rate, rise, vf, wday, prm, P, noauto=None):
 def fatality_tables(P, y_ppm=None):
     """P(fatality | exposure mode, release type, weather) at one H2S content (default: the annual mean) - for the tables"""
     y = (P['yH2S_ppm']['v'] * P['yH2S_scale']['v']) if y_ppm is None else y_ppm
+    yco2 = cq._props_all['props']['yCO2']
     tab = {}
     for rel, Qh in Q_REL.items():
         for w in wx_keys(P):
             delta = P['duty']['v'][rel]; c1, cd, c3, xl = geometry(Qh, w, P)
             f_overlap = min(1.0, P['t_at_valve_min']['v'] / P['t_fix_min']['v'])
             flash_resp = P['p_zone']['v'] * (P['p_ign_worker']['v'] + P['p_ign']['v'] * f_overlap) * P['p_fat_flash_small']['v']
-            h2s_resp = P['p_in_plume_h2s']['v'] * float(probit(c1 * y, P['t_at_valve_min']['v'] * delta, P))
-            lsir_ev = (P['p_zone']['v'] * P['p_ign']['v'] * P['p_fat_flash_small']['v'] if xl >= P['lsir_distance_m']['v'] else 0.0) + P['p_in_plume_h2s']['v'] * float(probit(cd * y, 30.0 * delta, P))
+            h2s_resp = P['p_in_plume_h2s']['v'] * float(tox(c1, P['t_at_valve_min']['v'] * delta, y, yco2, P)[0])
+            lsir_ev = (P['p_zone']['v'] * P['p_ign']['v'] * P['p_fat_flash_small']['v'] if xl >= P['lsir_distance_m']['v'] else 0.0) + P['p_in_plume_h2s']['v'] * float(tox(cd, 30.0 * delta, y, yco2, P)[0])
             flash_hour = P['p_zone']['v'] * (P['p_ign_worker']['v'] + P['p_ign']['v']) * P['p_fat_flash_small']['v']
-            h2s_hour = P['p_in_plume_h2s']['v'] * float(probit(c1 * y, 60.0 * delta, P))
-            tab[(rel, w)] = dict(C_1m=c1, H2S_1m_ppm=c1 * y, LFL_m=xl, duty=delta, p_fat_responder=flash_resp + h2s_resp, p_fat_flash=flash_resp, p_fat_h2s=h2s_resp,
-                                 p_fat_routine_hour=flash_hour + h2s_hour, H2S_lsir_ppm=cd * y, p_fat_lsir_per_event=lsir_ev)
+            h2s_hour = P['p_in_plume_h2s']['v'] * float(tox(c1, 60.0 * delta, y, yco2, P)[0])
+            tab[(rel, w)] = dict(C_1m=c1, H2S_1m_ppm=c1 * y, CO2_1m_pct=c1 * yco2 * 100, O2_1m_pct=20.95 * (1 - c1), LFL_m=xl, duty=delta, p_fat_responder=flash_resp + h2s_resp, p_fat_flash=flash_resp, p_fat_h2s=h2s_resp,
+                                 p_fat_co2_alone=float(cq.co2_probit_fatality(c1 * yco2 * 1e6, P['t_at_valve_min']['v'] * delta)), p_fat_routine_hour=flash_hour + h2s_hour, H2S_lsir_ppm=cd * y, p_fat_lsir_per_event=lsir_ev)
     return tab
 
 def weather_mix(P, day):
@@ -215,45 +251,49 @@ def run_case(case, f_on, P=None, prm_over=None, static=()):
     if 'daynight' in static: wday = np.full(n, wday.mean())
     if 'q' in static: q = np.full(n, q.mean())
     if 'h2s' in static: y = np.full(n, y.mean())
-    out['yH2S_ppm'] = y
+    comp = comp_series(P, n, static='h2s' in static); yco2 = comp['yCO2']
+    out['yH2S_ppm'] = y; out['yCO2'] = yco2; out['yCH4'] = comp['yCH4']
     pz, pi, piw, pfs, pip = (P[k]['v'] for k in ('p_zone', 'p_ign', 'p_ign_worker', 'p_fat_flash_small', 'p_in_plume_h2s'))
-    E = {e: np.zeros(n) for e in ('h2s_resp', 'flash_resp', 'mech_resp', 'h2s_rout', 'flash_rout')}
+    E = {e: np.zeros(n) for e in ('h2s_resp', 'flash_resp', 'mech_resp', 'h2s_rout', 'flash_rout', 'h2so_resp', 'h2so_rout')}   # 'h2s' = toxic (H2S + CO2), 'h2so' = H2S alone
     tot_lsir = np.zeros(n)
     # ---- fatality per exposure, hour by hour (weather and H2S of that hour)
     fat = {}
     for rel in ('R1 chatter (valve open)', 'R2 downstream stop', 'R3 isolated digester'):
         delta = P['duty']['v'][rel]; Qh = Q_REL[rel]
         f_overlap = min(1.0, P['t_at_valve_min']['v'] / P['t_fix_min']['v'])
-        fr_flash = np.zeros(n); fr_h2s = np.zeros(n); fh_flash = np.zeros(n); fh_h2s = np.zeros(n); fl = np.zeros(n)
+        fr_flash = np.zeros(n); fr_h2s = np.zeros(n); fh_flash = np.zeros(n); fh_h2s = np.zeros(n); fl = np.zeros(n); fr_o = np.zeros(n); fh_o = np.zeros(n)
         for w, wd in W.items():
-            c1, cd, c3, xl = geometry(Qh, w, P)
+            c1, cd, c3, xl = geo_hourly(Qh, w, P, comp)
             fr_flash += wd * pz * (piw + pi * f_overlap) * pfs
-            fr_h2s += wd * pip * probit(c1 * y, P['t_at_valve_min']['v'] * delta, P)
+            a, b = tox(c1, P['t_at_valve_min']['v'] * delta, y, yco2, P); fr_h2s += wd * pip * a; fr_o += wd * pip * b
             fh_flash += wd * pz * (piw + pi) * pfs
-            fh_h2s += wd * pip * probit(c1 * y, 60.0 * delta, P)
-            fl += wd * ((pz * pi * pfs if xl >= P['lsir_distance_m']['v'] else 0.0) + pip * probit(cd * y, 30.0 * delta, P))
-        fat[rel] = (fr_flash, fr_h2s, fh_flash, fh_h2s, fl)
+            a, b = tox(c1, 60.0 * delta, y, yco2, P); fh_h2s += wd * pip * a; fh_o += wd * pip * b
+            fl += wd * (np.where(xl >= P['lsir_distance_m']['v'], pz * pi * pfs, 0.0) + pip * tox(cd, 30.0 * delta, y, yco2, P)[0])
+        fat[rel] = (fr_flash, fr_h2s, fh_flash, fh_h2s, fl, fr_o, fh_o)
     rout = wday * P['routine_h_per_week']['v'] / (12.0 * 7.0)                # share of the hour spent on the roof (day shift only)
     tot_resp = np.zeros(n); tot_rout = np.zeros(n)
     for k in BR:
-        fr_flash, fr_h2s, fh_flash, fh_h2s, fl = fat[REL[k]]
+        fr_flash, fr_h2s, fh_flash, fh_h2s, fl, fr_o, fh_o = fat[REL[k]]
         p_roof = wday * P['p_roof']['v'][k][0] + (1 - wday) * P['p_roof']['v'][k][1]
         o = df[f'o_{k}'].to_numpy() * p_roof; s_ = df[f's_{k}'].to_numpy() * rout * P['p_near_valve_routine']['v']
         E['flash_resp'] += o * fr_flash; E['h2s_resp'] += o * fr_h2s; E['flash_rout'] += s_ * fh_flash; E['h2s_rout'] += s_ * fh_h2s
+        E['h2so_resp'] += o * fr_o; E['h2so_rout'] += s_ * fh_o
         out[f'IR_resp_{k}'] = o * (fr_flash + fr_h2s); out[f'IR_rout_{k}'] = s_ * (fh_flash + fh_h2s); out[f'LSIR_{k}'] = df[f'p_{k}'].to_numpy() * fl
         tot_resp += out[f'IR_resp_{k}'].to_numpy(); tot_rout += out[f'IR_rout_{k}'].to_numpy(); tot_lsir += out[f'LSIR_{k}'].to_numpy()
     # ---- a PVRV that does not relieve: exposure beside the manual vent (prevented) or on the roof at the seal failure
     V0 = cq._props_all['r5']['puff_m3']; Q_seal = V0 / P['tau_seal_s']['v'] * 3600.0
     def vent_fat(Qv):
-        fl_ = np.zeros(n); fh_ = np.zeros(n)
+        fl_ = np.zeros(n); fh_ = np.zeros(n); fo_ = np.zeros(n)
         for w, wd in W.items():
-            c1, _, _, _ = geometry(Qv, w, P)
-            fl_ += wd * pz * (piw + pi) * pfs; fh_ += wd * pip * probit(c1 * y, P['t_vent_manual_min']['v'], P)
-        return fl_, fh_
-    seal_h2s = np.zeros(n)
+            c1, _, _, _ = geo_hourly(Qv, w, P, comp)
+            a, b = tox(c1, P['t_vent_manual_min']['v'], y, yco2, P)
+            fl_ += wd * pz * (piw + pi) * pfs; fh_ += wd * pip * a; fo_ += wd * pip * b
+        return fl_, fh_, fo_
+    seal_h2s = np.zeros(n); seal_o = np.zeros(n)
     for w, wd in W.items():
-        _, _, c3, _ = geometry(Q_seal, w, P)
-        seal_h2s += wd * P['p_zone_R5']['v'] * probit(c3 * y, P['tau_seal_s']['v'] / 60.0, P)     # inside the 30-s depressurisation cloud, 3 m from the failure
+        _, _, c3, _ = geo_hourly(Q_seal, w, P, comp)
+        a, b = tox(c3, P['tau_seal_s']['v'] / 60.0, y, yco2, P)
+        seal_h2s += wd * P['p_zone_R5']['v'] * a; seal_o += wd * P['p_zone_R5']['v'] * b     # inside the 30-s depressurisation cloud, 3 m from the failure
     seal_flash = P['p_zone_R5']['v'] * (pi + piw) * P['p_fat_flash_R5']['v']; seal_mech = P['p_injury_seal']['v']
     pfd = bn.pv_pfd(prm); dirty = P['pv_dirty_factor']['v']
     pfd_single = min(1.0, pfd['single'] * dirty); pfd_shared = min(1.0, prm['beta_pv']['v'] * pfd_single + ((1 - prm['beta_pv']['v']) * pfd_single) ** 2)
@@ -277,10 +317,11 @@ def run_case(case, f_on, P=None, prm_over=None, static=()):
     vf_cache = {}
     for name, (rate, rise, vfo, na, Qv) in chains.items():
         if Qv not in vf_cache: vf_cache[Qv] = vent_fat(Qv)
-        v_flash, v_h2s = vf_cache[Qv]
+        v_flash, v_h2s, v_o = vf_cache[Qv]
         p_fail, p_vent, p_on = overpressure_chain(rate, rise, vfo, wday, prm, P, na)
         out[f'n_init_{name}'] = rate; out[f'p_fail_{name}'] = p_fail
         E['flash_resp'] += p_vent * v_flash + p_on * seal_flash; E['h2s_resp'] += p_vent * v_h2s + p_on * seal_h2s; E['mech_resp'] += p_on * seal_mech
+        E['h2so_resp'] += p_vent * v_o + p_on * seal_o
         out[f'IR_resp_{name}'] = p_vent * (v_flash + v_h2s) + p_on * (seal_flash + seal_h2s + seal_mech)
         tot_resp += out[f'IR_resp_{name}'].to_numpy()
         lsir_ = p_fail * (P['p_zone_R5']['v'] * pi * P['p_fat_flash_R5']['v'] + seal_h2s); out[f'LSIR_{name}'] = lsir_; tot_lsir += lsir_
@@ -300,9 +341,10 @@ def summarize(out, case, f_on):
         s[f'IR_resp_{k}'] = out[f'IR_resp_{k}'].sum()
     s['IR_day'] = out.loc[out.day, 'IR_total'].sum(); s['IR_night'] = out.loc[~out.day, 'IR_total'].sum()
     n_resp = QRA['n_responders']['v']
-    for e in ('h2s', 'flash', 'mech'):
+    for e in ('h2s', 'flash', 'mech', 'h2so'):
         r_ = out[f'E_{e}_resp'].sum(); o_ = out[f'E_{e}_rout'].sum() if f'E_{e}_rout' in out else 0.0
         s[f'PLL_{e}'] = r_ + o_; s[f'IRw_{e}'] = r_ / n_resp + o_
+    s['PLL_co2_increment'] = s['PLL_h2s'] - s['PLL_h2so']; s['IRw_co2_increment'] = s['IRw_h2s'] - s['IRw_h2so']   # 'h2s' columns = toxic (H2S + CO2)
     return s
 
 def generic_qra(P=None):
@@ -402,6 +444,8 @@ if __name__ == '__main__':
             ('H2S probit: Bevi 2009 / RIVM 2018 (base)', {'h2s_probit': 'bevi2009'}, {}),
             ('H2S content: in-situ desulphurisation x0.2 / x1.5', {'yH2S_scale': 0.2}, {'yH2S_scale': 1.5}),
             ('H2S: annual mean 2,527 ppm / hourly ADM1 (base)', {'yH2S_mode': 'mean'}, {}),
+            ('CO2 toxicity: excluded / included (base)', {'co2_tox': False}, {}),
+            ('CH4/CO2/H2O: annual mean / hourly ADM1 (base)', {'comp_mode': 'mean'}, {}),
             ('duty cycle ignored (time-mean plume) / pulses at full stay', {'duty': {k: (v ** N if v < 1 else 1.0) for k, v in QRA['duty']['v'].items()}}, {'duty': {k: 1.0 for k in QRA['duty']['v']}}),
             ('near-field concentration: free plume x0.5 / recirculation x2', {'conc_factor': 0.5}, {'conc_factor': 2.0}),
             ('plume entrainment beta 0.8 / 0.4', {'beta_entrain': 0.8}, {'beta_entrain': 0.4}),
