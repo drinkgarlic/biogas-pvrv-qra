@@ -5,3 +5,4 @@ dynamic_qra/out/
 dynamic_qra/fig/
 external/
 *.log
+report_figs/out/

@@ -35,6 +35,9 @@ biogas-pvrv-qra/
 │   ├── run_dynamic_qra.py             one-command driver
 │   ├── get_external_models.sh         clones the GitHub dispersion codes used as cross-checks into external/
 │   └── Biogas_PVRV_QRA_Colab.ipynb
+├── report_figs/
+│   ├── figs_appendix6_ko.py           figures of the research report (Korean labels: 부록 Ⅵ, Ⅳ장) from the same tables
+│   └── README.md                      which file is which figure of the report
 └── results/
     ├── tables/                        reference outputs of the study
     └── figures/
@@ -47,9 +50,12 @@ git clone https://github.com/drinkgarlic/biogas-pvrv-qra.git
 cd biogas-pvrv-qra
 pip install -r requirements.txt
 bash colab/get_external_models.sh                 # optional, for dispersion_check.py
-python colab/run_dynamic_qra.py                   # ~3 min
-python colab/run_dynamic_qra.py --updating        # + Bayesian updating demonstration (~6 min)
+python colab/run_dynamic_qra.py                   # ~2.5 min
+python colab/run_dynamic_qra.py --updating        # + Bayesian updating demonstration (~3 min more)
+python report_figs/figs_appendix6_ko.py           # figures of the report, Korean labels (needs a Korean font)
 ```
+
+A fresh clone run this way reproduces `results/tables` exactly (checked for v1.4 on 2026-10-30: `risk_summary`, `risk_by_effect`, `static_vs_dynamic`, `risk_sensitivity`, `updating`, `met_summary` identical).
 
 Weather comes from `data/kma_asos138_pohang_hourly_met.csv`; a new KMA download can be converted with `python dynamic_qra/met_stability.py --convert <raw.csv>`. Outputs go to `dynamic_qra/out` and `dynamic_qra/fig`. Nothing outside this repository is needed: `upstream/` carries the network, its inputs and the pressure-model tables. If you have re-run the 1-s pressure model in biogas-pvrv-BN, point `PVRV_PRESSURE_OUT` at its `pressure_model/out` folder and the source terms are rebuilt from the full one-second records instead of the frozen tables.
 
@@ -149,11 +155,11 @@ Run through one formula, Briggs and ISC3 agree within a factor of 1.5 beyond 10 
 ## 7. Roadmap
 
 1. ~~**Hourly weather.**~~ Done: KMA ASOS 138 → Turner class, vent-height wind and calms per hour. Next on this item: the wind direction is not used yet (it enters with the LSIR contours, item 7).
-2. **Toxic pathway.** ~~RIVM probit for H₂S with the right unit, breakdown by effect, results without a personal detector~~ (v1.1). Next: H₂S + CO₂ toxic load (HSE SLOT/SLOD, RIVM probit for H₂S), O₂-deficiency zone, AEGL-2 and occupational-exposure-limit endpoints, results with and without a personal detector, and a breakdown by effect (toxic / fire / mechanical).
+2. **Toxic pathway.** ~~RIVM probit for H₂S with the right unit, breakdown by effect, results without a personal detector~~ (v1.1). ~~CO₂ toxic load (HSE SLOT/SLOD) combined with H₂S as independent action~~ (v1.4). Next: synergy between H₂S and CO₂, an O₂-deficiency fatality model (O₂ at 1 m is reported only), AEGL-2 and occupational-exposure-limit endpoints.
 3. **ISC3-PG in the far field.** An own implementation of the EPA ISC3 coefficients (public tables), verified against GPM and FastGaussianPuff, replaces the Briggs-rural sigmas; Briggs stays as a sensitivity case.
 4. **Near-field / far-field matching.** The integral plume up to ~10 m, then ISC3-PG from a virtual source whose initial σy0, σz0 equal the plume width at the junction; decide the ground-reflection form of the near-field plume (currently 2× the free plume).
 5. **Building downwash screening** for a vent 1 m above an 18 m digester roof (Huber–Snyder / Schulman–Scire criteria as in ISC3).
-6. ~~**Hourly composition.**~~ H₂S of the hour from the PyADM1ODE series (v1.1); CH₄ still the annual mean in the plume (LFL).
+6. ~~**Hourly composition.**~~ H₂S of the hour from the PyADM1ODE series (v1.1); CH₄, CO₂ and H₂O of the hour for buoyancy, LFL and CO₂ toxicity (v1.4).
 7. **LSIR contours** on a plant grid using the hourly wind direction, instead of a single point at 3 m.
 8. **Vent fire branch.** Ignited, sustained release on the valve → seat and seal damage → leaking or stuck PVRV, with and without an endurance-burning flame arrester.
 9. **Monte Carlo** propagation of the judgement parameters (Latin hypercube) for an IR distribution instead of a tornado.
@@ -165,7 +171,7 @@ Run through one formula, Briggs and ISC3 agree within a factor of 1.5 beyond 10 
 ## 8. Limitations
 
 - **The exposure model is judgement.** Detection channels and actions are read from the P&ID and the alarm list, but the probabilities that a response puts someone on the roof, the time spent at the valve, the presence in the plume and the whole blocked-PVRV timing sub-model have no site data behind them yet.
-- **One weather station, one year.** Pohang ASOS 138 stands for the plant site; the Turner class and the 10-m wind are site-independent approximations of the roof-level flow, and a 24-h gap at the end of the record is filled from the previous day. The Turner and radiation/wind schemes agree within one class in 84 % of the daytime hours.
+- **One weather station, one year.** Pohang ASOS 138 stands for the plant site; the Turner class and the 10-m wind are site-independent approximations of the roof-level flow, and a 24-h gap at the end of the record is filled from the previous day. The Turner classes and the EPA SRDT radiation/wind key agree exactly in 66 % and within one class in 97 % of the daytime hours.
 - **The near field is analytical.** No Pasquill–Gifford scheme is defined below 100 m; the integral plume carries a factor-2 conservatism from its reflection form; building wakes are not modelled.
 - **The frequencies are inherited.** Everything upstream of the release — the 1-s model, the BN priors, the operator response distribution — carries the limitations listed in biogas-pvrv-BN.
 
