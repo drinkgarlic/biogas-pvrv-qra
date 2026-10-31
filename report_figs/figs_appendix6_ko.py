@@ -129,10 +129,10 @@ def f_check():
     x = np.logspace(0, 3, 300)
     fig, ax = plt.subplots(1, 3, figsize=(6.4, 2.9), gridspec_kw=dict(wspace=0.5))
     for cls, u, ls in (('D', 5.0, '-'), ('F', 2.0, '--')):
-        b = cq.sig(x, cls); g = dc.ext_gpm(cls, x); f = dc.ext_farm(cls, x, u)
+        b = cq.sig(x, cls); g = dc.ext_gpm(cls, x); f = dc.ext_rural(cls, x, u)
         ax[0].plot(x, b[0], color=C[0], ls=ls, label=f'Briggs {cls}'); ax[1].plot(x, b[1], color=C[0], ls=ls, label=f'Briggs {cls}')
         if g is not None: ax[0].plot(x, g[0], color=C[1], ls=ls, label=f'ISC3-PG {cls}'); ax[1].plot(x, g[1], color=C[1], ls=ls, label=f'ISC3-PG {cls}')
-        if f is not None: ax[0].plot(x, f[0], color=C[2], ls=ls, label=f'TNO farm {cls}'); ax[1].plot(x, f[1], color=C[2], ls=ls, label=f'TNO farm {cls}')
+        if f is not None: ax[0].plot(x, f[0], color=C[2], ls=ls, label=f'TNO rural {cls}'); ax[1].plot(x, f[1], color=C[2], ls=ls, label=f'TNO rural {cls}')
         for (c2, xr), (syr, szr) in dc.PG_REF.items():
             if c2 == cls: ax[0].plot(xr, syr, 'k*', ms=6); ax[1].plot(xr, szr, 'k*', ms=6)
         bb = cq.sig(np.maximum(x, 1e-3), cls); near = cq.plume_centreline(141 / 3600, u, cls, x)

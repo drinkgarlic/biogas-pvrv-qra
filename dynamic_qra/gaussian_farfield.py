@@ -7,8 +7,10 @@ final rise, ground reflection, receptor at any height. Far-field concentrations 
 rate is used (the valve pulses at 141 m3/h with a duty cycle Q_mean / 141; see risk.py for the near-field dose).
 
 Cross-checks (optional, only if the repositories were cloned into ../external by colab/get_external_models.sh):
-  * koaandmud/GPM                     - EPA ISC3 Pasquill-Gifford sigma fits (Turner curves), Manchester teaching code
-  * gerritjandebruin/gaussian-plume   - Dutch 'farm' / 'NOGEPA' sigma scheme (KNMI-type), EU CLINSH project, Zenodo DOI
+  * koaandmud/GPM                     - EPA ISC3 Pasquill-Gifford sigma fits (Turner curves); P. Connolly's teaching code
+                                        (University of Manchester, 2017) as re-uploaded to GitHub
+  * gerritjandebruin/gaussian-plume   - TNO rural sigma scheme (the package's land option, named mode='farm'; 'nogepa' is
+                                        the sea option), EU LIFE CLINSH project, Zenodo DOI
 Neither carries an explicit licence, so they are not vendored.
 Outputs: out/farfield_h2s.csv, out/model_comparison.csv, fig/farfield_h2s.png, fig/model_comparison.png
 """
@@ -60,7 +62,7 @@ def ext_gpm_sigmas(cls, x):
     return sy, sz
 
 def ext_gplume_sigmas(cls, x, u, z0=0.2):
-    """TNO 'farm' scheme, called with the package's own conventions (checked in dispersion_check.py): z0 is the ROUGHNESS LENGTH
+    """TNO rural scheme (package option mode='farm'), called with the package's own conventions (checked in dispersion_check.py): z0 is the ROUGHNESS LENGTH
     (its docstring says 'source height', but its examples pass z0 = 0.2 next to a separate hs), tc = calculate_tc(dx, u) = dx/(3600 u).
     sigma_y grows with travel time^0.35, i.e. it is a relative-diffusion (instantaneous plume) parameterisation, not a 10-min average"""
     p = os.path.join(EXT, 'gaussian-plume', 'src')
@@ -99,10 +101,10 @@ def main():
         d = {'x_m': xs, 'near-field integral plume (this work)': near * 1e2, 'Gaussian PG Briggs-rural, no rise (this work)': gau * 1e2, 'Gaussian PG + Briggs rise (this work)': gau_r * 1e2}
         s = ext_gpm_sigmas(cls, xs)                                   # same formula for every scheme (an earlier version used Q/(pi u sy sz) here: 2x)
         if s is not None:
-            sy, sz = s; d['Gaussian ISC3 PG (koaandmud/GPM)'] = gaussian_from_sigmas(Q, u, np.maximum(sy, 1e-3), np.maximum(sz, 1e-3), h_s, h_s) * 1e2
+            sy, sz = s; d['Gaussian ISC3 PG fit (Connolly, koaandmud/GPM)'] = gaussian_from_sigmas(Q, u, np.maximum(sy, 1e-3), np.maximum(sz, 1e-3), h_s, h_s) * 1e2
         s = ext_gplume_sigmas(cls, xs, u)
         if s is not None:
-            sy, sz = s; d["Gaussian TNO 'farm' scheme, z0 0.2 m (gerritjandebruin/gaussian-plume)"] = gaussian_from_sigmas(Q, u, np.maximum(sy, 1e-3), np.maximum(sz, 1e-3), h_s, h_s) * 1e2
+            sy, sz = s; d["Gaussian TNO rural scheme, z0 0.2 m (gerritjandebruin/gaussian-plume)"] = gaussian_from_sigmas(Q, u, np.maximum(sy, 1e-3), np.maximum(sz, 1e-3), h_s, h_s) * 1e2
         cdf = pd.DataFrame(d); cdf.insert(0, 'weather', wname); comp.append(cdf)
     comp = pd.concat(comp, ignore_index=True); comp.to_csv(os.path.join(OUT, 'model_comparison.csv'), index=False, float_format='%.4g')
     print('\nbiogas on the plume axis (vol %), 141 m3/h, receptor at the vent height:'); print(comp.round(4).to_string(index=False))

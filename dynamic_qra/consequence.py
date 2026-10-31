@@ -9,7 +9,9 @@ Models (all analytical, documented so that PHAST / ALOHA can be used as a cross-
      light wind, where ambient turbulence alone would under-predict the dilution of a buoyant plume (relative density 0.80).
      Concentrations are reported on the plume axis (conservative for a receptor at the vent height).
   2. Morton-Taylor-Turner pure plume for calm conditions: centreline dilution of a buoyant plume rising vertically,
-     entrainment coefficient alpha = 0.1 (Gaussian profiles) -> concentration vs height and plume radius.
+     top-hat profiles with entrainment coefficient alpha = 0.1 -> concentration vs height and plume radius. Measured values for a
+     round pure plume are typically 0.12-0.13 (Carazzo, Kaminski & Tait 2006, J. Fluid Mech. 547); since C ~ alpha^(-4/3), 0.1 gives
+     about 30-40 % higher axis concentrations, i.e. it is on the conservative side.
   3. Depressurisation of a failed roof seal (R5): the compressed headspace (39 m3) is treated as a 30-s transient release with
      model 1 (base case); the TNO instantaneous Gaussian puff is also evaluated as an upper bound (it ignores the puff's own
      buoyant mixing and gives much longer distances).
@@ -74,7 +76,7 @@ def dist_to(Cstar, Q, u, cls, xmax=200.0, **kw):  # kw: r0, beta, factor, g1
     return float(x[i]) if i > 0 else xmax
 
 def mtt_plume(Q, z, alpha=0.1, g1=None):
-    """calm air, pure buoyant plume (Morton-Taylor-Turner, Gaussian profiles): centreline volume fraction and 1/e radius at height z above the vent"""
+    """calm air, pure buoyant plume (Morton-Taylor-Turner, top-hat profiles): mean volume fraction on the axis and top-hat radius at height z above the vent"""
     g1 = G * (RHO_A - RHO_G) / RHO_A if g1 is None else g1   # reduced gravity (m/s2), gas lighter than air
     B = g1 * Q                                            # buoyancy flux (m4/s3)
     z = np.maximum(np.asarray(z, float), 0.3)

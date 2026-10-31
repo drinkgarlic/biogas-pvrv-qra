@@ -1,18 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-Consistency check of the dispersion models used or pulled from GitHub, before any of them is trusted in the QRA.
+Consistency check of the dispersion coefficients, before the far-field Gaussian is trusted in the QRA. Three sigma schemes are
+compared, and only these three are run:
+  * Briggs (1973) open-country (rural) sigmas      - this work, used in consequence.py and gaussian_farfield.py
+  * EPA ISC3 fits of the Pasquill-Gifford-Turner curves - P. Connolly's Gaussian plume teaching code (University of Manchester,
+                                                     2017), as re-uploaded to GitHub in koaandmud/GPM (calc_sigmas.py)
+  * TNO rural scheme                               - gerritjandebruin/gaussian-plume (EU LIFE CLINSH); the package calls its
+                                                     land option mode='farm' (the other one is 'nogepa' for the sea)
 
 What is checked
-  1. The sigma schemes themselves: Briggs (1973) open-country (this work), the EPA ISC3 fits of the Pasquill-Gifford-Turner
-     curves (koaandmud/GPM) and the TNO 'farm' scheme (gerritjandebruin/gaussian-plume), at 10 m - 1 km for classes D and F,
-     against the tabulated PG-Turner values that every textbook reproduces.
+  1. The sigma schemes themselves, at 10 m - 1 km for classes D and F, against the tabulated PG-Turner values that every
+     textbook reproduces.
   2. The concentration formula: all three sigma schemes run through ONE elevated-source Gaussian with ground reflection
      (the earlier model_comparison.csv evaluated the external schemes with the ground-level form Q/(pi u sy sz), i.e. 2x).
   3. Mass balance: the integral of u C over the half-space must return Q.
   4. The near-field integral plume: the 1/pi (fully reflected) form used so far against the reflected form with the vent
      outlet h_v above the roof, which tends to the free plume (1/2pi) when sigma_z << h_v.
   5. Unit check of the external package's own concentration routine against the same formula.
-  6. Density: when would a dense-gas model (HEGADAS / HeavyGas.jl) apply at all.
+  6. Density: when would a dense-gas model apply at all (an argument from the relative density; no dense-gas code is run).
 Outputs: out/dispersion_check_*.csv, fig/dispersion_check.png
 """
 import os, sys, math
@@ -35,8 +40,8 @@ def ext_gpm(cls, x):
     sys.path.insert(0, p); from calc_sigmas import calc_sigmas; sys.path.pop(0)
     return calc_sigmas({'A': 1, 'B': 2, 'C': 3, 'D': 4, 'E': 5, 'F': 6}[cls], np.asarray(x, float))
 
-def ext_farm(cls, x, u, z0=Z0, mode='farm'):
-    """the package's own convention: z0 = roughness length (its docstring says source height, its examples pass z0 = 0.2 next to hs),
+def ext_rural(cls, x, u, z0=Z0, mode='farm'):
+    """TNO rural sigmas (the package's land option is named mode='farm'). The package's own convention: z0 = roughness length (its docstring says source height, its examples pass z0 = 0.2 next to hs),
     tc = calculate_tc(dx, u) = dx / (3600 u), i.e. travel time in hours (the author left a 'TODO: is this correct?')"""
     p = os.path.join(EXT, 'gaussian-plume', 'src')
     if not os.path.exists(os.path.join(p, 'GaussianPlume', 'GPFunctions.py')): return None
@@ -46,29 +51,6 @@ def ext_farm(cls, x, u, z0=Z0, mode='farm'):
     dc = GPC.dispersion_constants(mode); idx = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5}[cls]
     x = np.asarray(x, float); tc = GPF.calculate_tc(x, u)
     return GPF.calculate_sigma(x, z0, tc, dc, idx)
-
-def ext_ch4disp(cls, x):
-    """yunhal/CH4_dispersion (MIT): its own transcription of the ISC3 PG fits; distance in km"""
-    p = os.path.join(EXT, 'CH4_dispersion', 'code')
-    if not os.path.exists(os.path.join(p, 'gaussian_plume_functions.py')): return None
-    import ast                                   # the module imports pyproj / xarray at the top; take only this function
-    tree = ast.parse(open(os.path.join(p, 'gaussian_plume_functions.py'), encoding='utf-8').read())
-    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'compute_sigma_vals')
-    ns = {'np': np}; exec(compile(ast.Module(body=[fn], type_ignores=[]), 'compute_sigma_vals', 'exec'), ns)
-    xk = np.asarray(x, float) / 1000.0
-    return ns['compute_sigma_vals'](np.array([cls]), xk)
-
-def fgp_coefficients():
-    """Hammerling-Research-Group/FastGaussianPuff (MIT, C++): read the ISC3 coefficients from getSigmaCoefficients() and compare
-    them number by number with koaandmud/GPM; the C++ needs Eigen + pybind11 to build, so it is not run"""
-    f = os.path.join(EXT, 'FastGaussianPuff', 'src', 'CGaussianPuff.cpp')
-    g = os.path.join(EXT, 'GPM', 'calc_sigmas.py')
-    if not (os.path.exists(f) and os.path.exists(g)): return None
-    import re
-    src = open(f, encoding='utf-8').read(); src = src[src.index('void getSigmaCoefficients'):]
-    num = lambda t: sorted(set(round(float(v), 4) for v in re.findall(r'(?<![\w.])\d+\.\d+', t)))
-    a, b = num(src), num(open(g, encoding='utf-8').read())
-    return sorted(set(b) - set(a)), sorted(set(a) - set(b))
 
 def gauss_axis(sy, sz, u, z_rec=H_S, h=H_S):
     """elevated source, receptor on the axis at z_rec, ground reflection: the one formula used for every scheme here"""
@@ -87,32 +69,25 @@ def main():
     # ---- 1. sigma schemes
     rows = []
     for cls, u in (('D', 5.0), ('F', 2.0)):
-        b = cq.sig(xs, cls); g = ext_gpm(cls, xs); f = ext_farm(cls, xs, u); f_wrong = ext_farm(cls, xs, u, z0=H_S)
+        b = cq.sig(xs, cls); g = ext_gpm(cls, xs); f = ext_rural(cls, xs, u); f_wrong = ext_rural(cls, xs, u, z0=H_S)
         for i, x in enumerate(xs):
             r = dict(cls=cls, x_m=x, sy_Briggs=b[0][i], sz_Briggs=b[1][i])
             if g is not None: r.update(sy_ISC3=g[0][i], sz_ISC3=g[1][i])
-            if f is not None: r.update(sy_farm_z0_02=f[0][i], sz_farm_z0_02=f[1][i], sy_farm_z0_18=f_wrong[0][i], sz_farm_z0_18=f_wrong[1][i])
+            if f is not None: r.update(sy_TNO_z0_02=f[0][i], sz_TNO_z0_02=f[1][i], sy_TNO_z0_18=f_wrong[0][i], sz_TNO_z0_18=f_wrong[1][i])
             ref = PG_REF.get((cls, int(x)));  r.update(sy_PG_table=ref[0] if ref else np.nan, sz_PG_table=ref[1] if ref else np.nan)
             rows.append(r)
-    for r in rows:
-        c = ext_ch4disp(r['cls'], [r['x_m']])
-        if c is not None: r['sy_CH4disp'], r['sz_CH4disp'] = float(c[0][0]), float(c[1][0])
     sg = pd.DataFrame(rows); sg.to_csv(os.path.join(OUT, 'dispersion_check_sigmas.csv'), index=False, float_format='%.3g')
     print('1. sigma schemes (m)'); print(sg.round(3).to_string(index=False))
-
-    fg = fgp_coefficients()
-    if fg is not None:
-        print(f'   FastGaussianPuff vs GPM coefficient sets: only in GPM {fg[0]}, only in FastGaussianPuff {fg[1]}')
 
     # ---- 2. one concentration formula, three sigma schemes, plus the near-field plume
     xs2 = np.array([1, 2, 3, 5, 10, 30, 100, 300, 1000], float); rows = []
     for cls, u in (('D', 5.0), ('F', 2.0)):
-        b = cq.sig(np.maximum(xs2, 1e-3), cls); g = ext_gpm(cls, xs2); f = ext_farm(cls, xs2, u)
+        b = cq.sig(np.maximum(xs2, 1e-3), cls); g = ext_gpm(cls, xs2); f = ext_rural(cls, xs2, u)
         near = cq.plume_centreline(Q, u, cls, xs2)
         for i, x in enumerate(xs2):
             r = dict(cls=cls, x_m=x, near_field_plume=near[i] * 100, gauss_Briggs=gauss_axis(b[0][i], b[1][i], u) * 100)
             if g is not None: r['gauss_ISC3'] = gauss_axis(g[0][i], g[1][i], u) * 100
-            if f is not None: r['gauss_farm'] = gauss_axis(f[0][i], f[1][i], u) * 100
+            if f is not None: r['gauss_TNO'] = gauss_axis(f[0][i], f[1][i], u) * 100
             rows.append(r)
     cc = pd.DataFrame(rows); cc.to_csv(os.path.join(OUT, 'dispersion_check_conc.csv'), index=False, float_format='%.4g')
     print('\n2. biogas on the axis at the vent height (vol %), 141 m3/h, same Gaussian formula, different sigmas'); print(cc.round(4).to_string(index=False))
@@ -124,8 +99,8 @@ def main():
             sy, sz = cq.sig(x, cls); rows.append(dict(cls=cls, x_m=x, scheme='Briggs', sy=sy, sz=sz, int_uC_dydz_over_Q=mass_balance(sy, sz, u)))
             g = ext_gpm(cls, [x])
             if g is not None: rows.append(dict(cls=cls, x_m=x, scheme='ISC3', sy=g[0][0], sz=g[1][0], int_uC_dydz_over_Q=mass_balance(g[0][0], g[1][0], u)))
-            f = ext_farm(cls, [x], u)
-            if f is not None: rows.append(dict(cls=cls, x_m=x, scheme='farm', sy=f[0][0], sz=f[1][0], int_uC_dydz_over_Q=mass_balance(f[0][0], f[1][0], u)))
+            f = ext_rural(cls, [x], u)
+            if f is not None: rows.append(dict(cls=cls, x_m=x, scheme='TNO', sy=f[0][0], sz=f[1][0], int_uC_dydz_over_Q=mass_balance(f[0][0], f[1][0], u)))
     mb = pd.DataFrame(rows); mb.to_csv(os.path.join(OUT, 'dispersion_check_mass.csv'), index=False, float_format='%.4g')
     print('\n3. mass balance (should be 1.000)'); print(mb.round(4).to_string(index=False))
 
@@ -159,7 +134,7 @@ def main():
 
     # ---- 6. when would a dense-gas model apply
     y = np.linspace(0.40, 0.75, 8); rho_rel = (y * 16.04 + (1 - y) * 44.01) / 28.96 * (288.15 / 308.15)
-    print('\n6. relative density of the vented gas (35 C) vs CH4 fraction: ' + ', '.join(f'{yy:.2f}->{r:.2f}' for yy, r in zip(y, rho_rel)) + '  -> dense (> 1) only below ~52 % CH4 at 35 C; HEGADAS-type models need rho_g > rho_a')
+    print('\n6. relative density of the vented gas (35 C) vs CH4 fraction: ' + ', '.join(f'{yy:.2f}->{r:.2f}' for yy, r in zip(y, rho_rel)) + '  -> dense (> 1) only below ~52 % CH4 at 35 C; dense-gas models need rho_g > rho_a')
 
     # ---- figure
     import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt
@@ -168,16 +143,16 @@ def main():
     x = np.logspace(0, 3, 300)
     fig, ax = plt.subplots(1, 3, figsize=(15, 4.2), gridspec_kw=dict(wspace=0.3))
     for j, (cls, u, ls) in enumerate((('D', 5.0, '-'), ('F', 2.0, '--'))):
-        b = cq.sig(x, cls); g = ext_gpm(cls, x); f = ext_farm(cls, x, u)
+        b = cq.sig(x, cls); g = ext_gpm(cls, x); f = ext_rural(cls, x, u)
         ax[0].plot(x, b[0], color=C[0], ls=ls, label=f'Briggs rural {cls}'); ax[1].plot(x, b[1], color=C[0], ls=ls, label=f'Briggs rural {cls}')
-        if g is not None: ax[0].plot(x, g[0], color=C[1], ls=ls, label=f'ISC3 PG fit {cls} (GPM)'); ax[1].plot(x, g[1], color=C[1], ls=ls, label=f'ISC3 PG fit {cls} (GPM)')
-        if f is not None: ax[0].plot(x, f[0], color=C[2], ls=ls, label=f"TNO 'farm' {cls}, z0 0.2 m"); ax[1].plot(x, f[1], color=C[2], ls=ls, label=f"TNO 'farm' {cls}, z0 0.2 m")
+        if g is not None: ax[0].plot(x, g[0], color=C[1], ls=ls, label=f'ISC3 PG fit {cls}'); ax[1].plot(x, g[1], color=C[1], ls=ls, label=f'ISC3 PG fit {cls}')
+        if f is not None: ax[0].plot(x, f[0], color=C[2], ls=ls, label=f"TNO rural {cls}, z0 0.2 m"); ax[1].plot(x, f[1], color=C[2], ls=ls, label=f"TNO rural {cls}, z0 0.2 m")
         for (c2, xr), (syr, szr) in PG_REF.items():
             if c2 == cls: ax[0].plot(xr, syr, 'k*', ms=9); ax[1].plot(xr, szr, 'k*', ms=9)
         bb = cq.sig(np.maximum(x, 1e-3), cls); near = cq.plume_centreline(Q, u, cls, x)
         ax[2].plot(x, gauss_axis(bb[0], bb[1], u) * 100, color=C[0], ls=ls, label=f'Gaussian, Briggs {cls}')
         if g is not None: ax[2].plot(x, gauss_axis(g[0], g[1], u) * 100, color=C[1], ls=ls, label=f'Gaussian, ISC3 {cls}')
-        if f is not None: ax[2].plot(x, gauss_axis(f[0], f[1], u) * 100, color=C[2], ls=ls, label=f"Gaussian, 'farm' {cls}")
+        if f is not None: ax[2].plot(x, gauss_axis(f[0], f[1], u) * 100, color=C[2], ls=ls, label=f"Gaussian, TNO rural {cls}")
         ax[2].plot(x, near * 100, color=C[3], ls=ls, label=f'near-field plume {cls}')
     ax[0].plot([], [], 'k*', label='PG-Turner table (100 m, 1 km)')
     for a, t, yl in zip(ax, ('(a) sigma_y', '(b) sigma_z', '(c) axis concentration at the vent height, 141 m3/h')[:3], ('σy (m)', 'σz (m)', 'biogas (vol %)')):
