@@ -126,23 +126,32 @@ def f_near():
 
 # ---------------------------------------------------------------- 4. 확산모델 정합성
 def f_check():
+    """(a)(b) the three sigma schemes; (c) each scheme run through the SAME elevated-source Gaussian (dc.gauss_axis: receptor on
+    the axis at the vent height, no plume rise, ground reflection), 141 m3/h, D 5 m/s / F 2 m/s, plus the near-field plume"""
+    from matplotlib.lines import Line2D
     x = np.logspace(0, 3, 300)
-    fig, ax = plt.subplots(1, 3, figsize=(6.4, 2.9), gridspec_kw=dict(wspace=0.5))
+    fig, ax = plt.subplots(1, 3, figsize=(6.4, 3.1), gridspec_kw=dict(wspace=0.5))
     for cls, u, ls in (('D', 5.0, '-'), ('F', 2.0, '--')):
         b = cq.sig(x, cls); g = dc.ext_gpm(cls, x); f = dc.ext_rural(cls, x, u)
-        ax[0].plot(x, b[0], color=C[0], ls=ls, label=f'Briggs {cls}'); ax[1].plot(x, b[1], color=C[0], ls=ls, label=f'Briggs {cls}')
-        if g is not None: ax[0].plot(x, g[0], color=C[1], ls=ls, label=f'ISC3-PG {cls}'); ax[1].plot(x, g[1], color=C[1], ls=ls, label=f'ISC3-PG {cls}')
-        if f is not None: ax[0].plot(x, f[0], color=C[2], ls=ls, label=f'TNO rural {cls}'); ax[1].plot(x, f[1], color=C[2], ls=ls, label=f'TNO rural {cls}')
+        for k in (0, 1):
+            ax[k].plot(x, b[k], color=C[0], ls=ls)
+            if g is not None: ax[k].plot(x, g[k], color=C[1], ls=ls)
+            if f is not None: ax[k].plot(x, f[k], color=C[2], ls=ls)
         for (c2, xr), (syr, szr) in dc.PG_REF.items():
             if c2 == cls: ax[0].plot(xr, syr, 'k*', ms=6); ax[1].plot(xr, szr, 'k*', ms=6)
         bb = cq.sig(np.maximum(x, 1e-3), cls); near = cq.plume_centreline(141 / 3600, u, cls, x)
-        ax[2].plot(x, dc.gauss_axis(bb[0], bb[1], u) * 100, color=C[0], ls=ls, label=f'가우시안·Briggs {cls}')
-        if g is not None: ax[2].plot(x, dc.gauss_axis(g[0], g[1], u) * 100, color=C[1], ls=ls, label=f'가우시안·ISC3 {cls}')
-        ax[2].plot(x, near * 100, color=C[3], ls=ls, label=f'적분 플룸 {cls}')
+        ax[2].plot(x, dc.gauss_axis(bb[0], bb[1], u) * 100, color=C[0], ls=ls)
+        if g is not None: ax[2].plot(x, dc.gauss_axis(g[0], g[1], u) * 100, color=C[1], ls=ls)
+        if f is not None: ax[2].plot(x, dc.gauss_axis(f[0], f[1], u) * 100, color=C[2], ls=ls)
+        ax[2].plot(x, near * 100, color=C[3], ls=ls)
     for a, t, yl in zip(ax, ('(a) σy', '(b) σz', '(c) 축선 농도, 141 m³/h'), ('σy (m)', 'σz (m)', '바이오가스 (vol %)')):
         a.set_xscale('log'); a.set_yscale('log'); a.set_xlabel('거리 (m)'); a.set_ylabel(yl); a.set_title(t, loc='left'); a.tick_params(labelsize=7)
     ax[0].axvspan(1, 100, color='#efefef', zorder=0); ax[1].axvspan(1, 100, color='#efefef', zorder=0)
-    ax[0].legend(fontsize=5.6, loc='upper left'); ax[2].legend(fontsize=5.6, loc='lower left'); ax[2].axhline(cq.LFL * 100, color='k', lw=0.5, ls=':'); ax[2].set_ylim(1e-4, 100)
+    ax[2].axhline(cq.LFL * 100, color='k', lw=0.5, ls=':'); ax[2].text(900, cq.LFL * 100 * 1.25, 'LFL', fontsize=6, color='#444444', ha='right'); ax[2].set_ylim(1e-4, 100)
+    h = [Line2D([], [], color=C[0], label='Briggs 농촌'), Line2D([], [], color=C[1], label='ISC3–PG'), Line2D([], [], color=C[2], label='TNO rural'),
+         Line2D([], [], color=C[3], label='적분 플룸 (c)'), Line2D([], [], color='k', marker='*', ls='none', ms=6, label='PG–Turner 표값'),
+         Line2D([], [], color='#555555', ls='-', label='D, 5 m/s'), Line2D([], [], color='#555555', ls='--', label='F, 2 m/s')]
+    fig.legend(handles=h, loc='lower center', ncol=7, fontsize=6.2, bbox_to_anchor=(0.5, -0.14), handlelength=1.8, columnspacing=1.0)
     save(fig, 'f_check')
 
 # ---------------------------------------------------------------- 5. 원거리 H2S
