@@ -53,10 +53,12 @@ def g_reduced(rho_gas=None):
 
 def plume_centreline(Q, u, cls, x, r0=D_VENT / 2, beta=0.6, factor=1.0, g1=None):
     """volume fraction on the plume axis at downwind distance x (m); Q in m3/s, u in m/s.
-    sigma = sqrt(sigma_PG^2 + sigma_plume^2 + (r0/2)^2), sigma_plume = beta * z_rise / sqrt(2), z_rise = 1.6 B^(1/3) x^(2/3) / u (Briggs).
+    sigma = sqrt(sigma_PG^2 + sigma_plume^2 + (r0/2)^2), sigma_plume = beta * z_rise / sqrt(2), z_rise = 1.6 F^(1/3) x^(2/3) / u (Briggs) with F = g' Q / pi.
+    (v1.4 and earlier used g' Q without the 1/pi: z_rise and the plume width were pi^(1/3) = 1.46 times too large, the near-field
+    concentrations too low.)
     g1: reduced gravity of the gas of that hour (default: annual-mean composition)"""
     x = np.asarray(x, float)
-    B = (G1 if g1 is None else g1) * Q
+    B = (G1 if g1 is None else g1) * Q / math.pi                 # Briggs buoyancy flux parameter F = g' Q / pi (m4/s3)
     z_rise = 1.6 * B ** (1 / 3) * x ** (2 / 3) / u
     sp = beta * z_rise / math.sqrt(2)
     sy0, sz0 = sig(np.maximum(x, 1e-3), cls)
@@ -64,7 +66,7 @@ def plume_centreline(Q, u, cls, x, r0=D_VENT / 2, beta=0.6, factor=1.0, g1=None)
     return np.minimum(1.0, factor * Q / (math.pi * u * sy * sz))      # factor 0.5 = free plume 1/(2 pi); 1 = the base (axis value doubled, roof reflection); 2 = recirculation behind the hood / roof edge
 
 def plume_sigma(Q, u, cls, x, r0=D_VENT / 2, beta=0.6):
-    B = G1 * Q; z_rise = 1.6 * B ** (1 / 3) * x ** (2 / 3) / u; sp = beta * z_rise / math.sqrt(2)
+    B = G1 * Q / math.pi; z_rise = 1.6 * B ** (1 / 3) * x ** (2 / 3) / u; sp = beta * z_rise / math.sqrt(2)
     sy0, sz0 = sig(max(x, 1e-3), cls)
     return math.sqrt(sy0 ** 2 + sp ** 2 + (r0 / 2) ** 2), math.sqrt(sz0 ** 2 + sp ** 2 + (r0 / 2) ** 2), z_rise
 
@@ -78,7 +80,7 @@ def dist_to(Cstar, Q, u, cls, xmax=200.0, **kw):  # kw: r0, beta, factor, g1
 def mtt_plume(Q, z, alpha=0.1, g1=None):
     """calm air, pure buoyant plume (Morton-Taylor-Turner, top-hat profiles): mean volume fraction on the axis and top-hat radius at height z above the vent"""
     g1 = G * (RHO_A - RHO_G) / RHO_A if g1 is None else g1   # reduced gravity (m/s2), gas lighter than air
-    B = g1 * Q                                            # buoyancy flux (m4/s3)
+    B = g1 * Q / math.pi                                  # top-hat buoyancy flux b^2 w g' = g' Q / pi (m4/s3)
     z = np.maximum(np.asarray(z, float), 0.3)
     b = 6 * alpha / 5 * z                                 # plume radius (top-hat), m
     w = (5 / (6 * alpha)) * (9 * alpha * B / 10) ** (1 / 3) * z ** (-1 / 3)   # top-hat velocity

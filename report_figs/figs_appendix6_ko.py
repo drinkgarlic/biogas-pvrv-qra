@@ -124,34 +124,43 @@ def f_near():
     ax[0].set_ylim(0.05, 100); ax[1].set_ylim(1, 3e4)
     save(fig, 'f_near')
 
+
+# PG curves as fitted by Martin (1976, JAPCA 26:145): sigma_y = a x^0.894, sigma_z = c x^d + f, x in km, sigma in m (x <= 1 km set)
+MARTIN = {'D': (68.0, 33.2, 0.725, -1.7), 'F': (34.0, 14.35, 0.740, -0.35)}
+def martin_pg(cls, x_m):
+    a, c, d, f = MARTIN[cls]; xk = x_m / 1000.0
+    return a * xk ** 0.894, c * xk ** d + f
+
 # ---------------------------------------------------------------- 4. 확산모델 정합성
 def f_check():
-    """(a)(b) the three sigma schemes; (c) each scheme run through the SAME elevated-source Gaussian (dc.gauss_axis: receptor on
-    the axis at the vent height, no plume rise, ground reflection), 141 m3/h, D 5 m/s / F 2 m/s, plus the near-field plume"""
+    """(a)(b) the three sigma schemes; (c) each scheme run through the SAME elevated-source Gaussian (receptor on the axis at the
+    vent height, no plume rise, ground reflection), 141 m3/h, D 5 m/s / F 2 m/s"""
     from matplotlib.lines import Line2D
+    import matplotlib.ticker
     x = np.logspace(0, 3, 300)
-    fig, ax = plt.subplots(1, 3, figsize=(6.4, 3.1), gridspec_kw=dict(wspace=0.5))
+    fig, ax = plt.subplots(1, 3, figsize=(6.4, 3.3), gridspec_kw=dict(wspace=0.55))
     for cls, u, ls in (('D', 5.0, '-'), ('F', 2.0, '--')):
         b = cq.sig(x, cls); g = dc.ext_gpm(cls, x); f = dc.ext_rural(cls, x, u)
         for k in (0, 1):
-            ax[k].plot(x, b[k], color=C[0], ls=ls)
-            if g is not None: ax[k].plot(x, g[k], color=C[1], ls=ls)
-            if f is not None: ax[k].plot(x, f[k], color=C[2], ls=ls)
-        for (c2, xr), (syr, szr) in dc.PG_REF.items():
-            if c2 == cls: ax[0].plot(xr, syr, 'k*', ms=6); ax[1].plot(xr, szr, 'k*', ms=6)
-        bb = cq.sig(np.maximum(x, 1e-3), cls); near = cq.plume_centreline(141 / 3600, u, cls, x)
-        ax[2].plot(x, dc.gauss_axis(bb[0], bb[1], u) * 100, color=C[0], ls=ls)
-        if g is not None: ax[2].plot(x, dc.gauss_axis(g[0], g[1], u) * 100, color=C[1], ls=ls)
-        if f is not None: ax[2].plot(x, dc.gauss_axis(f[0], f[1], u) * 100, color=C[2], ls=ls)
-        ax[2].plot(x, near * 100, color=C[3], ls=ls)
+            ax[k].plot(x, b[k], color=C[0], ls=ls, lw=1.4)
+            if g is not None: ax[k].plot(x, g[k], color=C[1], ls=ls, lw=1.4)
+            if f is not None: ax[k].plot(x, f[k], color=C[2], ls=ls, lw=1.4)
+        for xr in (100.0, 1000.0):                                   # PG curve values, Martin (1976) fit
+            syr, szr = martin_pg(cls, xr); ax[0].plot(xr, syr, 'k*', ms=7); ax[1].plot(xr, szr, 'k*', ms=7)
+        bb = cq.sig(np.maximum(x, 1e-3), cls)
+        ax[2].plot(x, dc.gauss_axis(bb[0], bb[1], u) * 100, color=C[0], ls=ls, lw=1.4)
+        if g is not None: ax[2].plot(x, dc.gauss_axis(g[0], g[1], u) * 100, color=C[1], ls=ls, lw=1.4)
+        if f is not None: ax[2].plot(x, dc.gauss_axis(f[0], f[1], u) * 100, color=C[2], ls=ls, lw=1.4)
     for a, t, yl in zip(ax, ('(a) σy', '(b) σz', '(c) 축선 농도, 141 m³/h'), ('σy (m)', 'σz (m)', '바이오가스 (vol %)')):
-        a.set_xscale('log'); a.set_yscale('log'); a.set_xlabel('거리 (m)'); a.set_ylabel(yl); a.set_title(t, loc='left'); a.tick_params(labelsize=7)
+        a.set_xscale('log'); a.set_yscale('log'); a.set_xlabel('거리 (m)', fontsize=10); a.set_ylabel(yl, fontsize=10)
+        a.set_title(t, loc='left', fontsize=10.5); a.tick_params(labelsize=8.5)
+        a.set_xticks([1, 10, 100, 1000]); a.xaxis.set_major_formatter(matplotlib.ticker.LogFormatterSciNotation())
     ax[0].axvspan(1, 100, color='#efefef', zorder=0); ax[1].axvspan(1, 100, color='#efefef', zorder=0)
-    ax[2].axhline(cq.LFL * 100, color='k', lw=0.5, ls=':'); ax[2].text(900, cq.LFL * 100 * 1.25, 'LFL', fontsize=6, color='#444444', ha='right'); ax[2].set_ylim(1e-4, 100)
-    h = [Line2D([], [], color=C[0], label='Briggs 농촌'), Line2D([], [], color=C[1], label='ISC3–PG'), Line2D([], [], color=C[2], label='TNO rural'),
-         Line2D([], [], color=C[3], label='적분 플룸 (c)'), Line2D([], [], color='k', marker='*', ls='none', ms=6, label='PG–Turner 표값'),
-         Line2D([], [], color='#555555', ls='-', label='D, 5 m/s'), Line2D([], [], color='#555555', ls='--', label='F, 2 m/s')]
-    fig.legend(handles=h, loc='lower center', ncol=7, fontsize=6.2, bbox_to_anchor=(0.5, -0.14), handlelength=1.8, columnspacing=1.0)
+    ax[2].axhline(cq.LFL * 100, color='k', lw=0.6, ls=':'); ax[2].text(900, cq.LFL * 100 * 1.3, 'LFL', fontsize=8, color='#444444', ha='right'); ax[2].set_ylim(1e-4, 100)
+    h = [Line2D([], [], color=C[0], lw=1.6, label='Briggs 평지'), Line2D([], [], color=C[1], lw=1.6, label='ISC3–PG'), Line2D([], [], color=C[2], lw=1.6, label='TNO rural'),
+         Line2D([], [], color='k', marker='*', ls='none', ms=7, label='PG 곡선 (Martin 1976)'),
+         Line2D([], [], color='#555555', ls='-', lw=1.6, label='D, 5 m/s'), Line2D([], [], color='#555555', ls='--', lw=1.6, label='F, 2 m/s')]
+    fig.legend(handles=h, loc='lower center', ncol=6, fontsize=8, bbox_to_anchor=(0.5, -0.15), handlelength=2.0, columnspacing=1.2)
     save(fig, 'f_check')
 
 # ---------------------------------------------------------------- 5. 원거리 H2S

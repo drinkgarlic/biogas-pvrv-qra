@@ -31,8 +31,11 @@ H_S = 18.25         # vent height above grade (m)
 H_V = 1.0           # vent outlet above the digester roof (m)
 Q = 141.0 / 3600    # m3/s at the minimum stable opening
 
-# PG-Turner reference values (Turner 1970 workbook curves, as tabulated in Seinfeld & Pandis / de Nevers), metres
-PG_REF = {('D', 100): (8.1, 4.6), ('D', 1000): (68.0, 32.0), ('F', 100): (4.0, 2.2), ('F', 1000): (34.0, 14.0)}
+# Pasquill-Gifford curve values at 100 m and 1 km, computed from the fit of the PG (Turner 1970) curves by Martin DO (1976),
+# JAPCA 26(2):145-147: sigma_y = a x^0.894, sigma_z = c x^d + f (x in km, x <= 1 km set). The PG curves are graphs; earlier versions
+# carried hand-typed 'tabulated' values here (D 100 m 8.1 / 4.6, F 100 m 4.0 / 2.2) that had no traceable source.
+_MARTIN = {'D': (68.0, 33.2, 0.725, -1.7), 'F': (34.0, 14.35, 0.740, -0.35)}
+PG_REF = {(c, x): (round(a * (x / 1000) ** 0.894, 2), round(cc * (x / 1000) ** d + f, 2)) for c, (a, cc, d, f) in _MARTIN.items() for x in (100, 1000)}
 
 def ext_gpm(cls, x):
     p = os.path.join(EXT, 'GPM')
